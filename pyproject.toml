@@ -1,0 +1,38 @@
+[project]
+name = "project8"
+version = "0.1.0"
+description = "Confirmez vos compétences en MLOps (Partie 2/2)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = [
+    "E203",
+    "W503",
+    "E402",
+    "E501",
+]
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv", 
+    "venv",
+    ".jupyter",
+    "alembic/versions",
+    "migrations",
+]
+per-file-ignores = [
+    "*.ipynb:E402",
+    "alembic/*:E402,F401",
+]
+
+[dependency-groups]
+dev = [
+    "flake8>=7.3.0",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.28.0",
+]
