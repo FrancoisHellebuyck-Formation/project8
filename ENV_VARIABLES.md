@@ -78,13 +78,19 @@ cp .env.example .env
   - **Valeurs possibles** : `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
   - **Type** : string
 
-- `LOGGING_HANDLER` : Type de handler pour les logs
+- `LOGGING_HANDLER` : Type de handler pour les logs de l'API
   - **Par défaut** : `stdout`
   - **Valeurs possibles** :
     - `stdout` : Logs uniquement vers la console (standard output)
     - `redis` : Logs vers la console ET stockage dans Redis
   - **Type** : string
   - **Note** : En mode `redis`, les logs sont à la fois affichés dans la console et stockés dans Redis pour consultation via l'endpoint `/logs`. En mode `stdout`, les logs sont uniquement affichés dans la console.
+
+- `UI_LOG_LEVEL` : Niveau de log pour l'interface Gradio
+  - **Par défaut** : `INFO`
+  - **Valeurs possibles** : `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+  - **Type** : string
+  - **Note** : Configure le niveau de log spécifique pour l'interface utilisateur Gradio. Les logs UI sont toujours affichés sur stdout.
 
 ## Utilisation dans le code
 

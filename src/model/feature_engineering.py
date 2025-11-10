@@ -48,7 +48,7 @@ class FeatureEngineer:
             'PEER_PRESSURE', 'YELLOW_FINGERS', 'ANXIETY',
             'FATIGUE', 'ALLERGY', 'WHEEZING', 'COUGHING',
             'SHORTNESS OF BREATH', 'SWALLOWING DIFFICULTY',
-            'CHEST PAIN'
+            'CHEST PAIN', 'CHRONIC DISEASE'
         ]
 
         missing_columns = [
@@ -164,7 +164,7 @@ class FeatureEngineer:
             'PEER_PRESSURE', 'YELLOW_FINGERS', 'ANXIETY',
             'FATIGUE', 'ALLERGY', 'WHEEZING', 'COUGHING',
             'SHORTNESS OF BREATH', 'SWALLOWING DIFFICULTY',
-            'CHEST PAIN'
+            'CHEST PAIN', 'CHRONIC DISEASE'
         ]
 
     @staticmethod

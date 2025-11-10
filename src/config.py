@@ -42,6 +42,7 @@ class Settings:
     ENV: str = os.getenv("ENV", "development")
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOGGING_HANDLER: str = os.getenv("LOGGING_HANDLER", "stdout")
+    UI_LOG_LEVEL: str = os.getenv("UI_LOG_LEVEL", "INFO")
 
 
 # Instance globale des settings

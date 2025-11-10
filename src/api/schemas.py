@@ -67,6 +67,13 @@ class PatientData(BaseModel):
         description="Douleur thoracique (0=Non, 1=Oui)",
         alias="CHEST PAIN"
     )
+    CHRONIC_DISEASE: int = Field(
+        ...,
+        ge=0,
+        le=1,
+        description="Maladie chronique (0=Non, 1=Oui)",
+        alias="CHRONIC DISEASE"
+    )
 
     class Config:
         """Configuration Pydantic."""
@@ -87,7 +94,8 @@ class PatientData(BaseModel):
                 "COUGHING": 1,
                 "SHORTNESS OF BREATH": 1,
                 "SWALLOWING DIFFICULTY": 0,
-                "CHEST PAIN": 1
+                "CHEST PAIN": 1,
+                "CHRONIC DISEASE": 0
             }
         }
 

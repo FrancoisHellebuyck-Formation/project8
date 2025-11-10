@@ -31,8 +31,9 @@ Le projet est structuré en 3 parties principales :
 - Endpoints : `/predict`, `/health`, `/logs`
 - Logs stockés dans Redis
 
-### 3. Front-end Gradio (`./src/ui`) - *À venir*
+### 3. Front-end Gradio (`./src/ui`)
 - Interface utilisateur Gradio
+- Cases à cocher pour les paramètres binaires
 - Communique avec l'API FastAPI
 
 ### Infrastructure
@@ -64,6 +65,15 @@ Le projet est structuré en 3 parties principales :
 - ✅ Statistiques disponibles
 - ✅ Filtrage par niveau et limite
 
+### Interface Gradio
+- ✅ Interface web intuitive
+- ✅ Liste déroulante pour le genre
+- ✅ Cases à cocher pour paramètres binaires
+- ✅ Slider pour l'âge
+- ✅ Affichage du niveau de risque
+- ✅ Gestion des erreurs
+- ✅ Communication avec l'API
+
 ## 🚀 Installation
 
 ### Prérequis
@@ -84,6 +94,9 @@ make dev
 
 # Dans un autre terminal, lancer l'API
 make run-api
+
+# Dans un troisième terminal, lancer l'interface Gradio
+make run-ui
 ```
 
 ### Installation manuelle
@@ -106,6 +119,9 @@ docker run -d -p 6379:6379 redis:latest
 
 # Lancer l'API
 uvicorn src.api.main:app --reload
+
+# Lancer l'interface Gradio
+python -m src.ui.app
 ```
 
 ## 📖 Utilisation
@@ -122,6 +138,7 @@ make install-dev      # Développement
 
 # Développement
 make run-api          # Lancer l'API
+make run-ui           # Lancer l'interface Gradio
 make run-redis        # Lancer Redis
 make dev             # Environnement complet
 
@@ -179,7 +196,18 @@ curl http://localhost:8000/logs?limit=50
 curl http://localhost:8000/logs/stats
 ```
 
-### Documentation interactive
+### Interface Gradio
+
+Accéder à l'interface web : **http://localhost:7860**
+
+L'interface permet de :
+- Saisir l'âge du patient (slider)
+- Sélectionner le genre (liste déroulante)
+- Cocher les cases pour les symptômes et facteurs de risque
+- Obtenir une prédiction en un clic
+- Visualiser le niveau de risque et la probabilité
+
+### Documentation interactive API
 
 - **Swagger UI** : http://localhost:8000/docs
 - **ReDoc** : http://localhost:8000/redoc
@@ -188,6 +216,7 @@ curl http://localhost:8000/logs/stats
 
 - [CLAUDE.md](CLAUDE.md) - Règles de développement et architecture
 - [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Documentation complète de l'API
+- [UI_DOCUMENTATION.md](UI_DOCUMENTATION.md) - Documentation de l'interface Gradio
 - [FEATURE_ENGINEERING.md](FEATURE_ENGINEERING.md) - Feature engineering automatique
 - [ENV_VARIABLES.md](ENV_VARIABLES.md) - Variables d'environnement
 - [MAKEFILE_GUIDE.md](MAKEFILE_GUIDE.md) - Guide du Makefile
@@ -202,11 +231,13 @@ project8/
 │   ├── api/              # API FastAPI
 │   │   ├── main.py       # Application principale
 │   │   ├── schemas.py    # Modèles Pydantic
-│   │   └── redis_logger.py
+│   │   └── logging_config.py
 │   ├── model/            # Package modèle ML
 │   │   ├── model_loader.py
 │   │   ├── predictor.py
 │   │   └── feature_engineering.py
+│   ├── ui/               # Interface Gradio
+│   │   └── app.py        # Application Gradio
 │   └── config.py         # Configuration (.env)
 ├── model/                # Modèle ML entraîné
 │   └── model.pkl

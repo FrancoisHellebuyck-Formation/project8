@@ -1,17 +1,55 @@
 """
 Configuration du logging avec Redis.
 
-Ce module configure le logger Python standard pour utiliser redis-log-handler
-afin de stocker les logs dans Redis.
+Ce module configure le logger Python standard avec un handler personnalisé
+pour stocker les logs dans Redis.
 """
 
 import logging
 from typing import Optional
 
 import redis
-from redis_log_handler import RedisKeyHandler
 
 from ..config import settings
+
+
+class RedisHandler(logging.Handler):
+    """
+    Handler personnalisé pour stocker les logs dans Redis.
+    """
+
+    def __init__(
+        self,
+        redis_client: redis.Redis,
+        key: str,
+        max_length: int = 1000
+    ):
+        """
+        Initialise le handler Redis.
+
+        Args:
+            redis_client: Client Redis
+            key: Clé Redis pour stocker les logs
+            max_length: Nombre maximum de logs à conserver
+        """
+        super().__init__()
+        self.redis_client = redis_client
+        self.key = key
+        self.max_length = max_length
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """
+        Émet un log vers Redis.
+
+        Args:
+            record: Enregistrement de log
+        """
+        try:
+            log_entry = self.format(record)
+            self.redis_client.lpush(self.key, log_entry)
+            self.redis_client.ltrim(self.key, 0, self.max_length - 1)
+        except Exception:
+            self.handleError(record)
 
 
 def setup_logging(
@@ -68,8 +106,8 @@ def setup_logging(
                 # Tester la connexion
                 redis_client.ping()
 
-            # Créer le handler Redis
-            redis_handler = RedisKeyHandler(
+            # Créer le handler Redis personnalisé
+            redis_handler = RedisHandler(
                 redis_client=redis_client,
                 key=settings.REDIS_LOGS_KEY,
                 max_length=settings.REDIS_LOGS_MAX_SIZE

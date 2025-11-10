@@ -10,6 +10,8 @@ VENV_BIN := $(VENV)/bin
 UV := uv
 API_HOST := 0.0.0.0
 API_PORT := 8000
+GRADIO_HOST := 0.0.0.0
+GRADIO_PORT := 7860
 REDIS_PORT := 6379
 
 # Couleurs pour l'affichage
@@ -36,6 +38,7 @@ help:
 	@echo ""
 	@echo "$(GREEN)Développement:$(NC)"
 	@echo "  make run-api          - Lance l'API FastAPI"
+	@echo "  make run-ui           - Lance l'interface Gradio"
 	@echo "  make run-redis        - Lance Redis avec Docker"
 	@echo "  make stop-redis       - Arrête le conteneur Redis"
 	@echo ""
@@ -117,6 +120,12 @@ run-api:
 		--host $(API_HOST) \
 		--port $(API_PORT) \
 		--reload
+
+## run-ui: Lance l'interface Gradio
+run-ui:
+	@echo "$(BLUE)Démarrage de l'interface Gradio...$(NC)"
+	@echo "$(YELLOW)Interface disponible sur http://$(GRADIO_HOST):$(GRADIO_PORT)$(NC)"
+	@$(VENV_BIN)/python -m src.ui.app
 
 ## run-redis: Lance Redis avec Docker
 run-redis:
@@ -226,6 +235,7 @@ setup: install-dev
 dev: setup run-redis
 	@echo "$(GREEN)✓ Environnement de développement prêt$(NC)"
 	@echo "$(YELLOW)Lancez 'make run-api' dans un autre terminal$(NC)"
+	@echo "$(YELLOW)Lancez 'make run-ui' dans un troisième terminal$(NC)"
 
 ## ci: Commandes pour CI/CD
 ci: lint test
