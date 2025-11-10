@@ -1,0 +1,62 @@
+artifact_path: mlflow-artifacts:/5/models/m-be6d176d25174982942070c2b8b41c85/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.13.5
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.7.2
+is_signature_from_type_hint: false
+metadata:
+  author: "Fran\xE7ois Hellebuyck"
+  description: "Mod\xE8le final optimis\xE9 pour la d\xE9tection de cancer"
+  model_type: LightGBM
+  optimization: GridSearch + Threshold
+  pipeline: SMOTE + StandardScaler + LightGBM
+  status: production_ready
+  threshold_optimized: 'yes'
+mlflow_version: 3.4.0
+model_id: m-be6d176d25174982942070c2b8b41c85
+model_size_bytes: 684737
+model_uuid: m-be6d176d25174982942070c2b8b41c85
+prompts: null
+run_id: 8bb723d2871642b6a55efe27aaacdf01
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "long", "name": "GENDER", "required": true}, {"type": "double",
+    "name": "AGE", "required": true}, {"type": "long", "name": "SMOKING", "required":
+    true}, {"type": "long", "name": "YELLOW_FINGERS", "required": true}, {"type":
+    "long", "name": "ANXIETY", "required": true}, {"type": "long", "name": "PEER_PRESSURE",
+    "required": true}, {"type": "long", "name": "CHRONIC DISEASE", "required": true},
+    {"type": "long", "name": "FATIGUE", "required": true}, {"type": "long", "name":
+    "ALLERGY", "required": true}, {"type": "long", "name": "WHEEZING", "required":
+    true}, {"type": "long", "name": "ALCOHOL CONSUMING", "required": true}, {"type":
+    "long", "name": "COUGHING", "required": true}, {"type": "long", "name": "SHORTNESS
+    OF BREATH", "required": true}, {"type": "long", "name": "SWALLOWING DIFFICULTY",
+    "required": true}, {"type": "long", "name": "CHEST PAIN", "required": true}, {"type":
+    "double", "name": "SMOKING_x_AGE", "required": true}, {"type": "long", "name":
+    "SMOKING_x_ALCOHOL", "required": true}, {"type": "long", "name": "RESPIRATORY_SYMPTOMS",
+    "required": true}, {"type": "long", "name": "TOTAL_SYMPTOMS", "required": true},
+    {"type": "long", "name": "BEHAVIORAL_RISK_SCORE", "required": true}, {"type":
+    "long", "name": "SEVERE_SYMPTOMS", "required": true}, {"type": "integer", "name":
+    "AGE_GROUP", "required": true}, {"type": "long", "name": "HIGH_RISK_PROFILE",
+    "required": true}, {"type": "double", "name": "AGE_SQUARED", "required": true},
+    {"type": "long", "name": "CANCER_TRIAD", "required": true}, {"type": "long", "name":
+    "SMOKER_WITH_RESP_SYMPTOMS", "required": true}, {"type": "long", "name": "ADVANCED_SYMPTOMS",
+    "required": true}, {"type": "double", "name": "SYMPTOMS_PER_AGE", "required":
+    true}, {"type": "double", "name": "RESP_SYMPTOM_RATIO", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float64", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2025-10-20 08:13:53.431016'
