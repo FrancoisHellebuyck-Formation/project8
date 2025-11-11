@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Service Redis - Base de données en mémoire pour les logs
+  redis:
+    image: redis:7-alpine
+    container_name: ml-api-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - ml-api-network
+    volumes:
+      - redis-data:/data
+
+  # Service API FastAPI + Modèle ML
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ml-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Configuration de l'API
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+
+      # Configuration du modèle
+      - MODEL_PATH=/app/model/model.pkl
+
+      # Configuration Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_LOGS_KEY=api_logs
+      - REDIS_LOGS_MAX_SIZE=1000
+
+      # Configuration des logs
+      - LOG_LEVEL=INFO
+      - LOGGING_HANDLER=redis
+
+      # Environnement
+      - ENV=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ml-api-network
+
+networks:
+  ml-api-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
