@@ -31,7 +31,8 @@ class FeatureEngineer:
 
         Returns:
             pd.DataFrame: DataFrame avec toutes les features
-                         (de base + dérivées).
+                         (de base + dérivées) dans l'ordre attendu
+                         par le modèle MLflow.
 
         Raises:
             ValueError: Si des colonnes requises sont manquantes.
@@ -61,6 +62,9 @@ class FeatureEngineer:
 
         # Calculer les features dérivées
         df = FeatureEngineer._add_derived_features(df)
+
+        # Réordonner les colonnes selon le schéma MLflow
+        df = FeatureEngineer._reorder_columns(df)
 
         return df
 
@@ -107,11 +111,11 @@ class FeatureEngineer:
             df['SHORTNESS OF BREATH']
         )
 
-        # Catégories d'âge
+        # Catégories d'âge (converti en codes numériques)
         df['AGE_GROUP'] = pd.cut(
             df['AGE'],
             bins=[0, 50, 60, 70, 100],
-            labels=['<50', '50-60', '60-70', '70+']
+            labels=False
         )
 
         # Risque élevé : homme + fumeur + âge > 60
@@ -150,6 +154,42 @@ class FeatureEngineer:
         )
 
         return df
+
+    @staticmethod
+    def _reorder_columns(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Réordonne les colonnes selon le schéma MLflow.
+
+        L'ordre des colonnes doit correspondre exactement à celui
+        défini dans model/MLmodel signature.
+
+        Args:
+            df: DataFrame avec toutes les features.
+
+        Returns:
+            pd.DataFrame: DataFrame avec colonnes réordonnées.
+        """
+        # Ordre exact selon MLmodel signature
+        column_order = [
+            # Features de base (15)
+            'GENDER', 'AGE', 'SMOKING', 'YELLOW_FINGERS',
+            'ANXIETY', 'PEER_PRESSURE', 'CHRONIC DISEASE',
+            'FATIGUE', 'ALLERGY', 'WHEEZING',
+            'ALCOHOL CONSUMING', 'COUGHING',
+            'SHORTNESS OF BREATH', 'SWALLOWING DIFFICULTY',
+            'CHEST PAIN',
+            # Features dérivées (14)
+            'SMOKING_x_AGE', 'SMOKING_x_ALCOHOL',
+            'RESPIRATORY_SYMPTOMS', 'TOTAL_SYMPTOMS',
+            'BEHAVIORAL_RISK_SCORE', 'SEVERE_SYMPTOMS',
+            'AGE_GROUP', 'HIGH_RISK_PROFILE', 'AGE_SQUARED',
+            'CANCER_TRIAD', 'SMOKER_WITH_RESP_SYMPTOMS',
+            'ADVANCED_SYMPTOMS', 'SYMPTOMS_PER_AGE',
+            'RESP_SYMPTOM_RATIO'
+        ]
+
+        # Réordonner
+        return df[column_order]
 
     @staticmethod
     def get_required_input_columns() -> list:

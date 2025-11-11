@@ -10,7 +10,6 @@ import json
 
 import gradio as gr
 import requests
-from typing import Tuple
 
 from ..config import settings
 from .logging_config import setup_ui_logger
@@ -34,13 +33,13 @@ def predict(
     shortness_of_breath: bool,
     swallowing_difficulty: bool,
     chest_pain: bool,
-    chronic_disease: bool
-) -> Tuple[str, str]:
+    chronic_disease: bool,
+):
     """
-    Envoie les données du patient à l'API et retourne la prédiction.
+    Envoie les données du patient à l'API et retourne la visualisation.
 
     Args:
-        age: Âge du patient (0-120)
+        age: Âge du patient (20-80)
         gender: Genre ("Masculin" ou "Féminin")
         smoking: Fumeur
         alcohol: Consommation d'alcool
@@ -57,8 +56,47 @@ def predict(
         chronic_disease: Maladie chronique
 
     Returns:
-        Tuple[str, str]: Message de prédiction et niveau de risque
+        str: HTML avec barre de progression colorée
     """
+    # Compter le nombre de symptômes cochés
+    symptoms = [
+        smoking,
+        alcohol,
+        peer_pressure,
+        yellow_fingers,
+        anxiety,
+        fatigue,
+        allergy,
+        wheezing,
+        coughing,
+        shortness_of_breath,
+        swallowing_difficulty,
+        chest_pain,
+        chronic_disease,
+    ]
+    num_symptoms = sum(symptoms)
+
+    # Vérifier qu'au moins 3 symptômes sont cochés
+    if num_symptoms < 3:
+        logger.warning(
+            f"Prédiction refusée: seulement {num_symptoms} symptôme(s) "
+            f"coché(s), minimum 3 requis"
+        )
+        return f"""
+        <div style="padding: 20px; font-family: sans-serif; text-align: center;">
+            <h3 style="color: #f59e0b; margin: 0 0 10px 0;">
+                ⚠️ Pas assez d'informations pour effectuer une prédiction
+            </h3>
+            <p style="color: #6b7280; margin: 0;">
+                Veuillez cocher au minimum 3 symptômes ou facteurs de risque
+                pour obtenir une prédiction fiable.
+            </p>
+            <p style="color: #6b7280; margin: 10px 0 0 0; font-size: 14px;">
+                Actuellement: {num_symptoms} symptôme(s) coché(s)
+            </p>
+        </div>
+        """
+
     # Construire le payload pour l'API
     payload = {
         "AGE": age,
@@ -75,7 +113,7 @@ def predict(
         "SHORTNESS OF BREATH": int(shortness_of_breath),
         "SWALLOWING DIFFICULTY": int(swallowing_difficulty),
         "CHEST PAIN": int(chest_pain),
-        "CHRONIC DISEASE": int(chronic_disease)
+        "CHRONIC DISEASE": int(chronic_disease),
     }
 
     # Debug: afficher le payload
@@ -88,56 +126,92 @@ def predict(
     try:
         # Appel à l'API
         response = requests.post(
-            f"{settings.API_URL}/predict",
-            json=payload,
-            timeout=10
+            f"{settings.API_URL}/predict", json=payload, timeout=10
         )
         response.raise_for_status()
 
         data = response.json()
-        prediction = data.get("prediction", 0)
         probability = data.get("probability", 0.0)
-        message = data.get("message", "")
 
-        # Formater la réponse
-        if prediction == 1:
-            result = f"⚠️ **RISQUE ÉLEVÉ DE CANCER DU POUMON**\n\n{message}"
-            if probability:
-                result += f"\n\nProbabilité: {probability:.1%}"
-            risk_level = "🔴 ÉLEVÉ"
-        else:
-            result = f"✅ **RISQUE FAIBLE DE CANCER DU POUMON**\n\n{message}"
-            if probability:
-                result += f"\n\nProbabilité: {probability:.1%}"
-            risk_level = "🟢 FAIBLE"
-
-        return result, risk_level
+        # Créer la barre de progression HTML avec gradient
+        return create_probability_bar(probability)
 
     except requests.exceptions.ConnectionError:
-        error_msg = (
-            "❌ **Erreur de connexion**\n\n"
-            f"Impossible de se connecter à l'API ({settings.API_URL}).\n"
-            "Vérifiez que l'API est en cours d'exécution."
-        )
-        return error_msg, "⚫ ERREUR"
+        logger.error(f"Impossible de se connecter à l'API ({settings.API_URL})")
+        return create_probability_bar(0.0, error=True)
 
     except requests.exceptions.Timeout:
-        error_msg = (
-            "❌ **Délai d'attente dépassé**\n\n"
-            "L'API n'a pas répondu dans le délai imparti."
-        )
-        return error_msg, "⚫ ERREUR"
+        logger.error("L'API n'a pas répondu dans le délai imparti")
+        return create_probability_bar(0.0, error=True)
 
     except requests.exceptions.HTTPError as e:
-        error_msg = (
-            f"❌ **Erreur HTTP {response.status_code}**\n\n"
-            f"{str(e)}"
-        )
-        return error_msg, "⚫ ERREUR"
+        logger.error(f"Erreur HTTP {response.status_code}: {str(e)}")
+        return create_probability_bar(0.0, error=True)
 
     except Exception as e:
-        error_msg = f"❌ **Erreur inattendue**\n\n{str(e)}"
-        return error_msg, "⚫ ERREUR"
+        logger.error(f"Erreur inattendue: {str(e)}")
+        return create_probability_bar(0.0, error=True)
+
+
+def create_probability_bar(probability: float, error: bool = False) -> str:
+    """
+    Crée une barre de progression HTML avec gradient de couleurs.
+
+    Args:
+        probability: Probabilité entre 0.0 et 1.0
+        error: Indique si c'est une erreur
+
+    Returns:
+        str: Code HTML de la barre
+    """
+    if error:
+        return """
+        <div style="text-align: center; padding: 20px;">
+            <p style="color: #ef4444; font-size: 18px; font-weight: bold;">
+                ❌ Erreur de connexion à l'API
+            </p>
+        </div>
+        """
+
+    percentage = probability * 100
+
+    # Déterminer la couleur en fonction du pourcentage
+    if percentage < 33:
+        color = "#22c55e"  # Vert
+        risk_text = "FAIBLE"
+        emoji = "🟢"
+    elif percentage < 66:
+        color = "#f59e0b"  # Orange
+        risk_text = "MODÉRÉ"
+        emoji = "🟠"
+    else:
+        color = "#ef4444"  # Rouge
+        risk_text = "ÉLEVÉ"
+        emoji = "🔴"
+
+    html = f"""
+    <div style="padding: 20px; font-family: sans-serif;">
+        <div style="margin-bottom: 15px;">
+            <h3 style="margin: 0 0 10px 0; color: #1f2937;">
+                {emoji} Risque de cancer du poumon: {risk_text}
+            </h3>
+            <p style="margin: 0; font-size: 24px; font-weight: bold; color: {color};">
+                {percentage:.1f}%
+            </p>
+        </div>
+
+        <div style="position: relative; height: 40px; background: linear-gradient(to right, #22c55e 0%, #84cc16 25%, #f59e0b 50%, #fb923c 75%, #ef4444 100%); border-radius: 20px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="position: absolute; left: {percentage}%; top: 50%; transform: translate(-50%, -50%); width: 4px; height: 50px; background: white; border: 2px solid #1f2937; border-radius: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #6b7280;">
+            <span>0% (Faible)</span>
+            <span>50% (Modéré)</span>
+            <span>100% (Élevé)</span>
+        </div>
+    </div>
+    """
+    return html
 
 
 def create_interface() -> gr.Blocks:
@@ -148,8 +222,7 @@ def create_interface() -> gr.Blocks:
         gr.Blocks: Interface Gradio configurée
     """
     with gr.Blocks(
-        title="Prédiction Cancer du Poumon",
-        theme=gr.themes.Soft()
+        title="Prédiction Cancer du Poumon", theme=gr.themes.Soft()
     ) as interface:
         gr.Markdown(
             """
@@ -168,93 +241,55 @@ def create_interface() -> gr.Blocks:
             with gr.Column():
                 gr.Markdown("### 📋 Informations générales")
                 age_input = gr.Slider(
-                    minimum=0,
-                    maximum=120,
+                    minimum=20,
+                    maximum=80,
                     value=50,
                     step=1,
                     label="Âge",
-                    info="Âge du patient en années"
+                    info="Âge du patient en années (20-80 ans)",
                 )
-                gender_input = gr.Dropdown(
+                gender_input = gr.Radio(
                     choices=["Féminin", "Masculin"],
                     value="Féminin",
                     label="Genre",
-                    info="Sélectionner le genre du patient"
+                    info="Sélectionner le genre du patient",
                 )
 
-                gr.Markdown("### 🚬 Facteurs de risque comportementaux")
-                smoking_input = gr.Checkbox(
-                    label="Fumeur",
-                    value=False
-                )
-                alcohol_input = gr.Checkbox(
-                    label="Consommation d'alcool",
-                    value=False
-                )
+                gr.Markdown("### 🍾 Facteurs de risque comportementaux")
+                smoking_input = gr.Checkbox(label="Fumeur", value=False)
+                alcohol_input = gr.Checkbox(label="Consommation d'alcool", value=False)
                 peer_pressure_input = gr.Checkbox(
-                    label="Pression des pairs",
-                    value=False
+                    label="Pression des pairs", value=False
                 )
 
-                gr.Markdown("### 🔍 Signes physiques")
-                yellow_fingers_input = gr.Checkbox(
-                    label="Doigts jaunes",
-                    value=False
-                )
-                anxiety_input = gr.Checkbox(
-                    label="Anxiété",
-                    value=False
-                )
-                fatigue_input = gr.Checkbox(
-                    label="Fatigue chronique",
-                    value=False
-                )
-                allergy_input = gr.Checkbox(
-                    label="Allergies",
-                    value=False
-                )
+                gr.Markdown("### 👫 Signes physiques")
+                yellow_fingers_input = gr.Checkbox(label="Doigts jaunes", value=False)
+                anxiety_input = gr.Checkbox(label="Anxiété", value=False)
+                fatigue_input = gr.Checkbox(label="Fatigue chronique", value=False)
+                allergy_input = gr.Checkbox(label="Allergies", value=False)
 
             with gr.Column():
                 gr.Markdown("### 🫁 Symptômes respiratoires")
-                wheezing_input = gr.Checkbox(
-                    label="Respiration sifflante",
-                    value=False
-                )
-                coughing_input = gr.Checkbox(
-                    label="Toux persistante",
-                    value=False
-                )
-                shortness_input = gr.Checkbox(
-                    label="Essoufflement",
-                    value=False
-                )
+                wheezing_input = gr.Checkbox(label="Respiration sifflante", value=False)
+                coughing_input = gr.Checkbox(label="Toux persistante", value=False)
+                shortness_input = gr.Checkbox(label="Essoufflement", value=False)
 
                 gr.Markdown("### 💢 Autres symptômes")
-                swallowing_input = gr.Checkbox(
-                    label="Difficulté à avaler",
-                    value=False
-                )
-                chest_pain_input = gr.Checkbox(
-                    label="Douleur thoracique",
-                    value=False
-                )
+                swallowing_input = gr.Checkbox(label="Difficulté à avaler", value=False)
+                chest_pain_input = gr.Checkbox(label="Douleur thoracique", value=False)
                 chronic_disease_input = gr.Checkbox(
-                    label="Maladie chronique",
-                    value=False
+                    label="Maladie chronique", value=False
                 )
 
                 gr.Markdown("### 🎯 Résultat")
                 predict_btn = gr.Button(
-                    "Obtenir la prédiction",
-                    variant="primary",
-                    size="lg"
+                    "Obtenir la prédiction", variant="primary", size="lg"
                 )
 
-                risk_output = gr.Textbox(
-                    label="Niveau de risque",
-                    interactive=False
+                result_html = gr.HTML(
+                    label="Probabilité de cancer du poumon",
+                    value=create_probability_bar(0.0),
                 )
-                result_output = gr.Markdown()
 
         # Connecter le bouton à la fonction de prédiction
         predict_btn.click(
@@ -274,9 +309,9 @@ def create_interface() -> gr.Blocks:
                 shortness_input,
                 swallowing_input,
                 chest_pain_input,
-                chronic_disease_input
+                chronic_disease_input,
             ],
-            outputs=[result_output, risk_output]
+            outputs=result_html,
         )
 
         gr.Markdown(
@@ -286,11 +321,14 @@ def create_interface() -> gr.Blocks:
 
             Cette interface utilise:
             - **FastAPI** pour l'API REST
-            - **scikit-learn** pour le modèle ML
+            - **LightGBM** pour le modèle ML
             - **Gradio** pour l'interface utilisateur
 
-            Les prédictions sont basées sur 14 features d'entrée et 14
-            features calculées automatiquement (28 features au total).
+            Les prédictions sont basées sur 15 features d'entrée et 14
+            features calculées automatiquement (29 features au total).
+
+            La barre de probabilité indique le risque prédit de cancer
+            du poumon de 0% (risque très faible) à 100% (risque très élevé).
             """
         )
 
@@ -298,9 +336,7 @@ def create_interface() -> gr.Blocks:
 
 
 def launch_ui(
-    server_name: str = None,
-    server_port: int = None,
-    share: bool = False
+    server_name: str = None, server_port: int = None, share: bool = False
 ) -> None:
     """
     Lance l'interface Gradio.
@@ -318,11 +354,7 @@ def launch_ui(
     print(f"🚀 Lancement de l'interface Gradio sur {host}:{port}")
     print(f"📡 API URL: {settings.API_URL}")
 
-    interface.launch(
-        server_name=host,
-        server_port=port,
-        share=share
-    )
+    interface.launch(server_name=host, server_port=port, share=share)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,32 @@
 # Docker - Configuration et Déploiement
 
-Ce répertoire contient les fichiers de configuration Docker pour déployer l'API ML avec Redis.
+Ce répertoire contient les fichiers de configuration Docker pour déployer l'application ML avec différentes architectures.
 
-## 📦 Architecture
+## 📁 Fichiers disponibles
 
-L'application est déployée avec Docker Compose et comprend deux services :
+### 1. `Dockerfile` - API FastAPI seule
+Dockerfile pour lancer uniquement l'API FastAPI avec le modèle ML.
+- **Usage** : Développement local, tests unitaires
+- **Services** : API FastAPI (port 8000)
+- **Logs** : stdout ou Redis (selon configuration)
+
+### 2. `Dockerfile.hf` - Conteneur complet pour Hugging Face Spaces
+Dockerfile all-in-one incluant Redis, API et UI Gradio dans un seul conteneur.
+- **Usage** : Déploiement sur Hugging Face Spaces
+- **Services** : Redis (6379) + API FastAPI (8000) + UI Gradio (7860)
+- **Logs** : Redis in-memory (256MB)
+- **Démarrage** : Script automatique avec health checks
+
+### 3. `docker-compose.yml` - Architecture multi-conteneurs
+Configuration Docker Compose pour le développement et la production locale.
+- **Usage** : Développement local, déploiement on-premise
+- **Services** : Redis + API FastAPI + UI Gradio (3 conteneurs séparés)
+- **Réseau** : Network Docker interne
+- **Volumes** : Persistence Redis
+
+## 📦 Architecture docker-compose
+
+L'application est déployée avec Docker Compose et comprend trois services :
 
 ### 1. Service API (`api`)
 - **Image** : Construite depuis `Dockerfile`
@@ -24,6 +46,16 @@ L'application est déployée avec Docker Compose et comprend deux services :
   - Mémoire max : 256 MB
   - Politique d'éviction : allkeys-lru
   - Données persistées dans un volume Docker
+
+### 3. Service UI Gradio (`ui`)
+- **Image** : Construite depuis `Dockerfile`
+- **Port** : 7860
+- **Fonction** : Interface utilisateur Gradio
+- **Caractéristiques** :
+  - Interface interactive pour les prédictions
+  - Communication avec l'API via le réseau Docker
+  - Barre de progression colorée pour le risque
+  - Dépend du service API (attend son health check)
 
 ## 🚀 Utilisation
 
@@ -283,12 +315,97 @@ make docker-up
 docker stack deploy -c docker-compose.yml ml-api
 ```
 
+## 🚢 Déploiement sur Hugging Face Spaces
+
+### Utilisation de Dockerfile.hf
+
+Le fichier `Dockerfile.hf` est spécialement conçu pour Hugging Face Spaces et contient tout dans un seul conteneur.
+
+**Architecture interne :**
+```
+┌────────────────────────────────────────┐
+│   HF Space Container (Dockerfile.hf)  │
+│                                        │
+│  1. Redis (daemon, port 6379)         │
+│  2. FastAPI API (background, 8000)    │
+│  3. Gradio UI (foreground, 7860) ◄────┼─── Public
+└────────────────────────────────────────┘
+```
+
+**Séquence de démarrage :**
+1. 📦 Redis démarre en mode daemon
+2. ⏳ Vérification que Redis répond (10 tentatives)
+3. 🚀 API FastAPI démarre en arrière-plan
+4. ⏳ Vérification que l'API répond (30 tentatives)
+5. 🎨 UI Gradio démarre (processus principal)
+
+**Variables d'environnement :**
+- `REDIS_HOST=localhost` : Redis local
+- `REDIS_PORT=6379` : Port Redis
+- `LOGGING_HANDLER=redis` : Logs dans Redis
+- `API_URL=http://localhost:8000` : URL API interne
+- `GRADIO_SERVER_PORT=7860` : Port public Gradio
+
+**Déploiement automatique :**
+Le workflow GitHub Actions (`.github/workflows/cicd.yml`) déploie automatiquement sur HF Spaces quand :
+- Branch: `main`
+- Workflow: `workflow_dispatch` avec `environment=production`
+- Tous les tests passent
+
+```bash
+# Le workflow copie automatiquement Dockerfile.hf vers Dockerfile
+cp docker/Dockerfile.hf Dockerfile
+```
+
+### Tester Dockerfile.hf localement
+
+```bash
+# Construire l'image
+docker build -f docker/Dockerfile.hf -t ml-app-hf .
+
+# Lancer le conteneur
+docker run -p 7860:7860 ml-app-hf
+
+# Accéder à l'UI
+open http://localhost:7860
+```
+
+**Logs de démarrage :**
+```
+📦 Démarrage de Redis en arrière-plan...
+⏳ Attente que Redis soit prêt...
+Tentative 1/10...
+✅ Redis prêt!
+🚀 Démarrage de l'API FastAPI en arrière-plan...
+⏳ Attente que l'API soit prête...
+Tentative 1/30...
+✅ API prête!
+🎨 Démarrage de l'UI Gradio sur le port 7860...
+Running on local URL:  http://0.0.0.0:7860
+```
+
+## 🔄 Comparaison des configurations
+
+| Aspect | Dockerfile | Dockerfile.hf | docker-compose.yml |
+|--------|-----------|---------------|-------------------|
+| **Usage** | Dev/Tests | HF Spaces | Production locale |
+| **Services** | API seule | Redis+API+UI | 3 conteneurs séparés |
+| **Redis** | Externe | In-memory (256MB) | Conteneur dédié |
+| **UI Gradio** | Non incluse | Incluse | Conteneur séparé |
+| **Ports** | 8000 | 7860 (public) | 8000, 6379, 7860 |
+| **Logging** | Configurable | Redis forcé | Redis par défaut |
+| **Startup** | Immédiat | Multi-étapes | Orchestré |
+| **Complexité** | Simple | Moyenne | Élevée |
+| **Scalabilité** | Manuelle | Limitée | Horizontale |
+
 ## 📚 Ressources
 
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
 - [FastAPI Deployment](https://fastapi.tiangolo.com/deployment/)
 - [Redis Configuration](https://redis.io/docs/manual/config/)
 - [Docker Best Practices](https://docs.docker.com/develop/dev-best-practices/)
+- [Hugging Face Spaces Docker](https://huggingface.co/docs/hub/spaces-sdks-docker)
+- [Gradio Deployment](https://gradio.app/guides/sharing-your-app/)
 
 ## 🆘 Support
 
@@ -297,3 +414,4 @@ Pour toute question ou problème :
 1. Vérifier les logs : `make docker-logs`
 2. Consulter la documentation : [../README.md](../README.md)
 3. Vérifier les issues GitHub
+4. Pour HF Spaces : Consulter les logs dans l'interface HF
