@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage run-api run-redis docker-build docker-up docker-down logs
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test
 
 # Variables
 PYTHON := python
@@ -33,8 +33,10 @@ help:
 	@echo "$(GREEN)Qualité du code:$(NC)"
 	@echo "  make lint             - Vérifie le code avec flake8"
 	@echo "  make format           - Formate le code (placeholder)"
-	@echo "  make test             - Lance les tests"
+	@echo "  make test             - Lance tous les tests"
 	@echo "  make test-coverage    - Lance les tests avec couverture"
+	@echo "  make test-api         - Lance les tests de l'API uniquement"
+	@echo "  make test-model       - Lance les tests du modèle uniquement"
 	@echo ""
 	@echo "$(GREEN)Développement:$(NC)"
 	@echo "  make run-api          - Lance l'API FastAPI"
@@ -99,17 +101,31 @@ format:
 ## test: Lance les tests
 test:
 	@echo "$(BLUE)Lancement des tests...$(NC)"
-	@$(VENV_BIN)/pytest tests/ -v || \
+	@$(UV) run pytest tests/ -v || \
 		(echo "$(RED)✗ Tests échoués$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Tous les tests passent$(NC)"
 
 ## test-coverage: Lance les tests avec couverture
 test-coverage:
 	@echo "$(BLUE)Lancement des tests avec couverture...$(NC)"
-	@$(VENV_BIN)/pytest tests/ --cov=src --cov-report=html \
-		--cov-report=term || \
+	@$(UV) run pytest tests/ --cov=src --cov-report=html \
+		--cov-report=term-missing --cov-report=xml || \
 		(echo "$(RED)✗ Tests échoués$(NC)" && exit 1)
-	@echo "$(GREEN)✓ Rapport de couverture généré dans htmlcov/$(NC)"
+	@echo "$(GREEN)✓ Rapport de couverture généré dans htmlcov/ et coverage.xml$(NC)"
+
+## test-api: Lance les tests de l'API uniquement
+test-api:
+	@echo "$(BLUE)Lancement des tests API...$(NC)"
+	@$(UV) run pytest tests/api/ -v || \
+		(echo "$(RED)✗ Tests API échoués$(NC)" && exit 1)
+	@echo "$(GREEN)✓ Tests API passent$(NC)"
+
+## test-model: Lance les tests du modèle uniquement
+test-model:
+	@echo "$(BLUE)Lancement des tests du modèle...$(NC)"
+	@$(UV) run pytest tests/model/ -v || \
+		(echo "$(RED)✗ Tests modèle échoués$(NC)" && exit 1)
+	@echo "$(GREEN)✓ Tests modèle passent$(NC)"
 
 ## run-api: Lance l'API FastAPI
 run-api:

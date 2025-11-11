@@ -1,0 +1,290 @@
+name: Project8 CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environnement'
+        type: choice
+        options: ['dev', 'production']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Load cached venv
+      id: cached-uv-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/uv.lock') }}
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Run tests with pytest
+      run: |
+        uv run pytest tests/ --cov=src --cov-report=xml --cov-report=html --cov-report=term-missing --cov-fail-under=80 -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.13"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Run flake8
+      run: uv run flake8 ./src
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.13"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: uv sync
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [test, lint, security]
+    if: github.ref == 'refs/heads/main' &&  github.event.inputs.environment == 'production'
+    environment: production  # Nécessite approbation dans Settings > Environments
+    
+    steps:
+    - name: Setup Git LFS
+      run: |
+        git lfs install
+
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: true
+
+    - name: Pull LFS files
+      run: git lfs pull
+
+    - name: Push to Hugging Face Space
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
+      run: |
+        echo "Configuration Git pour HF"
+        git config --global user.email "action@github.com"
+        git config --global user.name "GitHub Action"
+
+        echo "Ajouter remote HF si pas déjà présent"
+        if ! git remote | grep -q huggingface; then
+          git remote add huggingface https://huggingface.co/spaces/$HF_SPACE_NAME
+        fi
+
+        echo "Créer une branche orpheline pour éviter l'historique"
+        git checkout --orphan deploy-hf
+
+        echo "Configuration Git LFS pour HuggingFace"
+        git lfs track "*.pkl"
+
+        echo "Copier le Dockerfile pour HF Spaces (API + UI Gradio + Redis)"
+        cp docker/Dockerfile.hf Dockerfile
+
+        echo "Créer README.md pour HF Spaces avec metadata"
+        cat > README.md << 'EOF'
+---
+title: Lung Cancer Prediction
+emoji: 🫁
+colorFrom: green
+colorTo: red
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
+
+# 🫁 Lung Cancer Prediction - MLOps Project
+
+Application de prédiction de cancer du poumon avec interface Gradio et API FastAPI.
+
+## 🎯 Fonctionnalités
+
+- **🎨 Interface Gradio** : Interface utilisateur intuitive avec barre de progression colorée
+- **📊 API REST FastAPI** : Endpoints `/predict`, `/predict_proba`, `/health`, `/logs`
+- **🤖 Modèle ML LightGBM** : Modèle optimisé avec feature engineering automatique
+- **📈 Feature Engineering** : 15 features d'entrée → 29 features totales (14 dérivées)
+- **📝 Logs Redis** : Système de logging persistant avec Redis in-memory (256MB)
+
+## 🚀 Utilisation
+
+### Interface Gradio (Port 7860)
+
+L'interface Gradio est accessible directement sur le port principal. Elle permet de :
+- Saisir les informations du patient (âge, genre, symptômes)
+- Obtenir une prédiction visuelle avec barre de probabilité
+- Visualiser le risque : FAIBLE 🟢 / MODÉRÉ 🟠 / ÉLEVÉ 🔴
+
+### API REST (Port 8000)
+
+L'API FastAPI tourne en arrière-plan et peut être appelée directement :
+
+**Endpoints disponibles :**
+- `GET /` : Informations sur l'API
+- `GET /health` : État de santé de l'API
+- `POST /predict` : Prédiction binaire (0 ou 1)
+- `POST /predict_proba` : Prédiction avec probabilités
+- `GET /logs` : Récupérer les logs (limite configurable)
+- `DELETE /logs` : Supprimer les logs
+
+**Exemple de requête :**
+```bash
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "AGE": 65,
+    "GENDER": 1,
+    "SMOKING": 1,
+    "ALCOHOL CONSUMING": 1,
+    "PEER_PRESSURE": 0,
+    "YELLOW_FINGERS": 1,
+    "ANXIETY": 0,
+    "FATIGUE": 1,
+    "ALLERGY": 0,
+    "WHEEZING": 1,
+    "COUGHING": 1,
+    "SHORTNESS OF BREATH": 1,
+    "SWALLOWING DIFFICULTY": 0,
+    "CHEST PAIN": 1,
+    "CHRONIC DISEASE": 0
+  }'
+```
+
+## 📋 Features du modèle
+
+**15 features d'entrée :**
+- AGE, GENDER, SMOKING, ALCOHOL CONSUMING, PEER_PRESSURE
+- YELLOW_FINGERS, ANXIETY, FATIGUE, ALLERGY
+- WHEEZING, COUGHING, SHORTNESS OF BREATH
+- SWALLOWING DIFFICULTY, CHEST PAIN, CHRONIC DISEASE
+
+**14 features dérivées (automatiques) :**
+- HIGH_RISK_PROFILE, AGE_SQUARED, TOTAL_SYMPTOMS
+- RESPIRATORY_SYMPTOMS, CANCER_TRIAD, SMOKER_WITH_RESP_SYMPTOMS
+- ADVANCED_SYMPTOMS, SYMPTOMS_PER_AGE, AGE_RISK_INTERACTION
+- MALE_SMOKER, SYMPTOM_INTENSITY, RESPIRATORY_DISTRESS
+- CHRONIC_SMOKER_SYMPTOMS, SYMPTOM_DIVERSITY
+
+## ⚙️ Architecture
+
+```
+┌────────────────────────────────────────┐
+│   Hugging Face Space Container         │
+│                                        │
+│  ┌──────────────────────────────┐     │
+│  │   Gradio UI (Port 7860)      │◄────┼─── Interface publique
+│  │   (Frontend)                 │     │
+│  └────────────┬─────────────────┘     │
+│               │ localhost HTTP        │
+│               ↓                        │
+│  ┌──────────────────────────────┐     │
+│  │   FastAPI (Port 8000)        │     │
+│  │   (Backend)                  │     │
+│  └────────────┬─────────────────┘     │
+│               │                        │
+│               ↓                        │
+│  ┌──────────────────────────────┐     │
+│  │   Redis (Port 6379)          │     │
+│  │   (In-Memory Logs)           │     │
+│  └──────────────────────────────┘     │
+│               ↑                        │
+│  ┌────────────┴─────────────────┐     │
+│  │   LightGBM Model             │     │
+│  │   (ML Engine)                │     │
+│  └──────────────────────────────┘     │
+└────────────────────────────────────────┘
+```
+
+## 🏗️ Technologies
+
+- **Python 3.13+** : Langage principal
+- **FastAPI** : Framework API REST
+- **Gradio** : Interface utilisateur interactive
+- **LightGBM** : Algorithme de machine learning
+- **Redis** : Base de données in-memory pour les logs
+- **Pydantic v2** : Validation des données
+- **Scikit-learn** : Pipeline ML
+- **Docker** : Containerisation
+- **pytest** : Tests unitaires (83% coverage)
+
+## 📚 Documentation
+
+- **Documentation API** : Disponible via `/docs` (Swagger UI)
+- **Tests** : 126 tests unitaires avec 83% de couverture
+- **CI/CD** : GitHub Actions avec tests automatiques
+- **Code Quality** : Flake8 compliant (88 char max)
+
+## ⚠️ Avertissement
+
+Cette application est à **but éducatif uniquement** et ne remplace pas un diagnostic médical professionnel. Les prédictions doivent être interprétées par un professionnel de santé qualifié.
+
+## 📄 Licence
+
+MIT License - Projet OpenClassrooms MLOps (Partie 2/2)
+
+---
+
+**Développé avec ❤️ dans le cadre du parcours MLOps OpenClassrooms**
+EOF
+
+        echo "Suppression des données non nécessaires en production"
+        git rm -f *.pdf 2>/dev/null || true
+        git rm -rf docs 2>/dev/null || true
+        git rm -rf sql 2>/dev/null || true
+        git rm -rf tests 2>/dev/null || true
+        git rm -rf docker 2>/dev/null || true
+        git rm -f docker-compose.yml 2>/dev/null || true
+
+        echo "Ajouter tous les fichiers nécessaires (y compris LFS)"
+        git add -A
+        git commit -m "Deploy to HuggingFace Spaces: API FastAPI + UI Gradio"
+
+        echo "Push vers HF avec authentification (LFS supporté)"
+        git push https://oauth2:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME deploy-hf:main --force
+
+      
