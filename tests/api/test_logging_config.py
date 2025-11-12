@@ -10,8 +10,6 @@ Ce module teste:
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.api.logging_config import (
     clear_redis_logs,
     get_redis_logs,

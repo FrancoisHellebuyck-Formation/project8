@@ -69,6 +69,7 @@ omit = [
     "src/ui/*",
     "src/main.py",
     "src/*/__init__.py",
+    "src/simulator/*",
 ]
 
 [tool.coverage.report]
