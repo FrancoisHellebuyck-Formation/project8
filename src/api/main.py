@@ -8,6 +8,7 @@ pour les prédictions, le health check et la consultation des logs.
 import json
 import logging
 import time
+import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -88,6 +89,7 @@ app.add_middleware(
 async def log_requests(request: Request, call_next):
     """
     Middleware qui log toutes les requêtes avec:
+    - ID de transaction (pour les POST)
     - Endpoint appelé
     - Méthode HTTP
     - Inputs (body)
@@ -99,6 +101,12 @@ async def log_requests(request: Request, call_next):
         return await call_next(request)
 
     start_time = time.time()
+
+    # Générer un ID de transaction pour les POST
+    transaction_id = None
+    if request.method == "POST":
+        transaction_id = str(uuid.uuid4())
+        request.state.transaction_id = transaction_id
 
     # Lire le body de la requête
     body = None
@@ -131,23 +139,54 @@ async def log_requests(request: Request, call_next):
             "execution_time_ms": round(execution_time * 1000, 2)
         }
 
-        if body:
-            # Résumer les inputs pour ne pas surcharger les logs
-            if isinstance(body, dict):
-                input_summary = {
-                    k: v for k, v in list(body.items())[:5]
-                }
-                if len(body) > 5:
-                    input_summary["..."] = f"{len(body) - 5} more fields"
-                log_data["inputs"] = input_summary
-            else:
-                log_data["inputs"] = str(body)[:100]
+        # Ajouter l'ID de transaction pour les POST
+        if transaction_id:
+            log_data["transaction_id"] = transaction_id
 
-        logger.info(
+        # Logger toutes les données d'entrée pour /predict et /predict_proba
+        if body and request.url.path in ["/predict", "/predict_proba"]:
+            log_data["input_data"] = body
+
+        # Capturer le résultat de la prédiction si disponible
+        if request.url.path in ["/predict", "/predict_proba"]:
+            try:
+                # Lire le corps de la réponse
+                response_body = b""
+                async for chunk in response.body_iterator:
+                    response_body += chunk
+
+                # Parser le résultat
+                result = json.loads(response_body.decode())
+                log_data["result"] = result
+
+                # Recréer la réponse avec le body
+                from starlette.responses import Response
+                response = Response(
+                    content=response_body,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type
+                )
+            except Exception:
+                log_data["result"] = "<unable to parse>"
+
+        # Formatter le message de log
+        log_message = (
             f"API Call - {request.method} {request.url.path} - "
             f"Status: {response.status_code} - "
             f"Time: {log_data['execution_time_ms']}ms"
         )
+
+        if transaction_id:
+            log_message = f"[{transaction_id}] {log_message}"
+
+        if "input_data" in log_data:
+            log_message += f" - Input: {json.dumps(log_data['input_data'])}"
+
+        if "result" in log_data:
+            log_message += f" - Result: {json.dumps(log_data['result'])}"
+
+        logger.info(log_message)
 
     return response
 
@@ -234,15 +273,6 @@ async def predict(patient: PatientData):
             else "Prédiction négative"
         )
 
-        # Log détaillé de la prédiction
-        log_msg = (
-            f"Prediction - Result: {pred_value} ({message}) - "
-            f"Probability: {probability:.4f} - "
-            f"Patient: AGE={patient.AGE}, GENDER={patient.GENDER}, "
-            f"SMOKING={patient.SMOKING}"
-        )
-        logger.info(log_msg)
-
         return PredictionResponse(
             prediction=pred_value,
             probability=probability,
@@ -294,15 +324,6 @@ async def predict_proba(patient: PatientData):
             if pred_value == 1
             else "Prédiction négative"
         )
-
-        # Log détaillé avec probabilités
-        log_msg = (
-            f"Prediction (proba) - Result: {pred_value} ({message}) - "
-            f"Probabilities: [{proba_list[0]:.4f}, {proba_list[1]:.4f}] - "
-            f"Patient: AGE={patient.AGE}, GENDER={patient.GENDER}, "
-            f"SMOKING={patient.SMOKING}"
-        )
-        logger.info(log_msg)
 
         return PredictionProbabilityResponse(
             prediction=pred_value,

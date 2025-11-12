@@ -44,6 +44,37 @@ class Settings:
     LOGGING_HANDLER: str = os.getenv("LOGGING_HANDLER", "stdout")
     UI_LOG_LEVEL: str = os.getenv("UI_LOG_LEVEL", "INFO")
 
+    # Configuration du Simulateur
+    SIMULATOR_API_URL: str = os.getenv(
+        "SIMULATOR_API_URL", "http://localhost:8000"
+    )
+    SIMULATOR_NUM_REQUESTS: int = int(
+        os.getenv("SIMULATOR_NUM_REQUESTS", "100")
+    )
+    SIMULATOR_CONCURRENT_USERS: int = int(
+        os.getenv("SIMULATOR_CONCURRENT_USERS", "10")
+    )
+    SIMULATOR_DELAY: float = float(os.getenv("SIMULATOR_DELAY", "0.0"))
+    SIMULATOR_TIMEOUT: float = float(os.getenv("SIMULATOR_TIMEOUT", "30.0"))
+    SIMULATOR_ENDPOINT: str = os.getenv("SIMULATOR_ENDPOINT", "/predict")
+    SIMULATOR_VERBOSE: bool = os.getenv(
+        "SIMULATOR_VERBOSE", "false"
+    ).lower() in ("true", "1", "yes")
+
+    # Configuration du Data Drift
+    SIMULATOR_ENABLE_AGE_DRIFT: bool = os.getenv(
+        "SIMULATOR_ENABLE_AGE_DRIFT", "false"
+    ).lower() in ("true", "1", "yes")
+    SIMULATOR_AGE_DRIFT_TARGET: float = float(
+        os.getenv("SIMULATOR_AGE_DRIFT_TARGET", "70.0")
+    )
+    SIMULATOR_AGE_DRIFT_START: float = float(
+        os.getenv("SIMULATOR_AGE_DRIFT_START", "0.0")
+    )
+    SIMULATOR_AGE_DRIFT_END: float = float(
+        os.getenv("SIMULATOR_AGE_DRIFT_END", "100.0")
+    )
+
 
 # Instance globale des settings
 settings = Settings()
