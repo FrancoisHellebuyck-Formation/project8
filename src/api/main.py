@@ -5,11 +5,13 @@ Ce module contient l'application FastAPI avec les endpoints
 pour les prédictions, le health check et la consultation des logs.
 """
 
+import json
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import settings
@@ -79,6 +81,75 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Middleware pour logger les requêtes
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """
+    Middleware qui log toutes les requêtes avec:
+    - Endpoint appelé
+    - Méthode HTTP
+    - Inputs (body)
+    - Outputs (response)
+    - Temps d'exécution
+    """
+    # Ne pas logger les requêtes health check et logs pour éviter le bruit
+    if request.url.path in ["/health", "/logs"]:
+        return await call_next(request)
+
+    start_time = time.time()
+
+    # Lire le body de la requête
+    body = None
+    if request.method in ["POST", "PUT", "PATCH"]:
+        try:
+            body_bytes = await request.body()
+            if body_bytes:
+                body = json.loads(body_bytes.decode())
+
+                # Réinjecter le body pour que l'endpoint puisse le lire
+                async def receive():
+                    return {"type": "http.request", "body": body_bytes}
+
+                request._receive = receive
+        except Exception:
+            body = "<unable to parse>"
+
+    # Appeler l'endpoint
+    response = await call_next(request)
+
+    # Calculer le temps d'exécution
+    execution_time = time.time() - start_time
+
+    # Logger la requête si le logger est disponible
+    if logger:
+        log_data = {
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "execution_time_ms": round(execution_time * 1000, 2)
+        }
+
+        if body:
+            # Résumer les inputs pour ne pas surcharger les logs
+            if isinstance(body, dict):
+                input_summary = {
+                    k: v for k, v in list(body.items())[:5]
+                }
+                if len(body) > 5:
+                    input_summary["..."] = f"{len(body) - 5} more fields"
+                log_data["inputs"] = input_summary
+            else:
+                log_data["inputs"] = str(body)[:100]
+
+        logger.info(
+            f"API Call - {request.method} {request.url.path} - "
+            f"Status: {response.status_code} - "
+            f"Time: {log_data['execution_time_ms']}ms"
+        )
+
+    return response
 
 
 @app.get("/", tags=["Root"])
@@ -163,12 +234,14 @@ async def predict(patient: PatientData):
             else "Prédiction négative"
         )
 
-        logger.info(
-            f"Prédiction effectuée: {pred_value} "
-            f"(prob={probability:.2f}, age={patient.AGE})"
-            if probability
-            else f"Prédiction effectuée: {pred_value} (age={patient.AGE})"
+        # Log détaillé de la prédiction
+        log_msg = (
+            f"Prediction - Result: {pred_value} ({message}) - "
+            f"Probability: {probability:.4f} - "
+            f"Patient: AGE={patient.AGE}, GENDER={patient.GENDER}, "
+            f"SMOKING={patient.SMOKING}"
         )
+        logger.info(log_msg)
 
         return PredictionResponse(
             prediction=pred_value,
@@ -222,10 +295,14 @@ async def predict_proba(patient: PatientData):
             else "Prédiction négative"
         )
 
-        logger.info(
-            f"Prédiction avec probabilités: {pred_value} "
-            f"(proba={proba_list}, age={patient.AGE})"
+        # Log détaillé avec probabilités
+        log_msg = (
+            f"Prediction (proba) - Result: {pred_value} ({message}) - "
+            f"Probabilities: [{proba_list[0]:.4f}, {proba_list[1]:.4f}] - "
+            f"Patient: AGE={patient.AGE}, GENDER={patient.GENDER}, "
+            f"SMOKING={patient.SMOKING}"
         )
+        logger.info(log_msg)
 
         return PredictionProbabilityResponse(
             prediction=pred_value,
