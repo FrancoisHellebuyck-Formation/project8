@@ -10,8 +10,6 @@ import json
 
 import gradio as gr
 import requests
-from fastapi import Request
-from fastapi.responses import JSONResponse
 
 from ..config import settings
 from .logging_config import setup_ui_logger
@@ -376,6 +374,85 @@ def create_interface() -> gr.Blocks:
             """
         )
 
+        # === API Endpoints via Gradio (compatibles HF Spaces) ===
+        gr.Markdown("### 🔌 API Endpoints")
+
+        with gr.Accordion("API Documentation", open=False):
+            gr.Markdown(
+                """
+                Les endpoints suivants sont accessibles via l'API Gradio :
+                - `/api/health` : Health check
+                - `/api/predict_api` : Prédiction avec JSON
+                - `/api/predict_proba_api` : Prédiction avec probabilités
+                - `/api/logs_api` : Récupération des logs
+                """
+            )
+
+            # Health check endpoint
+            with gr.Row(visible=False):
+                health_trigger = gr.Button("health")
+                health_output = gr.JSON()
+                health_trigger.click(
+                    fn=lambda: api_health_proxy()[0],
+                    inputs=None,
+                    outputs=health_output,
+                    api_name="health"
+                )
+
+            # Predict endpoint (JSON input/output)
+            with gr.Row(visible=False):
+                predict_json_input = gr.JSON()
+                predict_json_output = gr.JSON()
+                predict_btn_api = gr.Button("predict")
+
+                def predict_api_wrapper(data):
+                    """Wrapper pour l'API de prédiction."""
+                    result, _ = api_predict_proxy(data)
+                    return result
+
+                predict_btn_api.click(
+                    fn=predict_api_wrapper,
+                    inputs=predict_json_input,
+                    outputs=predict_json_output,
+                    api_name="predict_api"
+                )
+
+            # Predict proba endpoint
+            with gr.Row(visible=False):
+                predict_proba_input = gr.JSON()
+                predict_proba_output = gr.JSON()
+                predict_proba_btn = gr.Button("predict_proba")
+
+                def predict_proba_api_wrapper(data):
+                    """Wrapper pour l'API predict_proba."""
+                    result, _ = api_predict_proba_proxy(data)
+                    return result
+
+                predict_proba_btn.click(
+                    fn=predict_proba_api_wrapper,
+                    inputs=predict_proba_input,
+                    outputs=predict_proba_output,
+                    api_name="predict_proba_api"
+                )
+
+            # Logs endpoint
+            with gr.Row(visible=False):
+                logs_limit_input = gr.Number(value=100, visible=False)
+                logs_output = gr.JSON()
+                logs_btn = gr.Button("logs")
+
+                def logs_api_wrapper(limit):
+                    """Wrapper pour l'API des logs."""
+                    result, _ = api_logs_proxy(int(limit))
+                    return result
+
+                logs_btn.click(
+                    fn=logs_api_wrapper,
+                    inputs=logs_limit_input,
+                    outputs=logs_output,
+                    api_name="logs_api"
+                )
+
     return interface
 
 
@@ -392,43 +469,17 @@ def launch_ui(
     """
     interface = create_interface()
 
-    # Ajouter les routes API proxy vers FastAPI
-    @interface.app.get("/api/health")
-    async def health_endpoint():
-        """Endpoint proxy vers /health de FastAPI."""
-        result, status_code = api_health_proxy()
-        return JSONResponse(content=result, status_code=status_code)
-
-    @interface.app.post("/api/predict")
-    async def predict_endpoint(request: Request):
-        """Endpoint proxy vers /predict de FastAPI."""
-        payload = await request.json()
-        result, status_code = api_predict_proxy(payload)
-        return JSONResponse(content=result, status_code=status_code)
-
-    @interface.app.post("/api/predict_proba")
-    async def predict_proba_endpoint(request: Request):
-        """Endpoint proxy vers /predict_proba de FastAPI."""
-        payload = await request.json()
-        result, status_code = api_predict_proba_proxy(payload)
-        return JSONResponse(content=result, status_code=status_code)
-
-    @interface.app.get("/api/logs")
-    async def logs_endpoint(limit: int = 100):
-        """Endpoint proxy vers /logs de FastAPI."""
-        result, status_code = api_logs_proxy(limit)
-        return JSONResponse(content=result, status_code=status_code)
-
     host = server_name or settings.GRADIO_HOST
     port = server_port or settings.GRADIO_PORT
 
     print(f"🚀 Lancement de l'interface Gradio sur {host}:{port}")
     print(f"📡 API URL: {settings.API_URL}")
-    print("\n📍 Endpoints API proxy disponibles sur Gradio:")
-    print(f"   - GET  http://{host}:{port}/api/health")
-    print(f"   - POST http://{host}:{port}/api/predict")
-    print(f"   - POST http://{host}:{port}/api/predict_proba")
-    print(f"   - GET  http://{host}:{port}/api/logs?limit=100")
+    print("\n📍 Endpoints API Gradio disponibles:")
+    print("   - /api/health (via API Gradio)")
+    print("   - /api/predict_api (via API Gradio)")
+    print("   - /api/predict_proba_api (via API Gradio)")
+    print("   - /api/logs_api (via API Gradio)")
+    print(f"\n💡 Documentation API: http://{host}:{port}/ (voir section API)")
 
     interface.launch(server_name=host, server_port=port, share=share)
 
