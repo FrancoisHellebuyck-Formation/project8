@@ -30,11 +30,23 @@ L'interface Gradio est accessible directement sur le port principal. Elle permet
 - Obtenir une prédiction visuelle avec barre de probabilité
 - Visualiser le risque : FAIBLE 🟢 / MODÉRÉ 🟠 / ÉLEVÉ 🔴
 
-### API REST (Port 8000)
+### API REST
 
-L'API FastAPI tourne en arrière-plan et peut être appelée directement :
+L'API FastAPI tourne en arrière-plan. Vous pouvez l'appeler via **deux méthodes** :
 
-**Endpoints disponibles :**
+#### Méthode 1 : Via les endpoints proxy Gradio (Port 7860)
+
+**Recommandé sur Hugging Face Spaces** - Tous les endpoints sont accessibles via le port principal :
+
+- `GET /api/health` : État de santé de l'API
+- `POST /api/predict` : Prédiction binaire (0 ou 1)
+- `POST /api/predict_proba` : Prédiction avec probabilités
+- `GET /api/logs?limit=100` : Récupérer les logs
+
+#### Méthode 2 : Accès direct FastAPI (Port 8000)
+
+**Disponible en développement local uniquement** :
+
 - `GET /` : Informations sur l'API
 - `GET /health` : État de santé de l'API
 - `POST /predict` : Prédiction binaire (0 ou 1)
@@ -42,9 +54,10 @@ L'API FastAPI tourne en arrière-plan et peut être appelée directement :
 - `GET /logs` : Récupérer les logs (limite configurable)
 - `DELETE /logs` : Supprimer les logs
 
-**Exemple de requête :**
+**Exemple de requête (via proxy Gradio) :**
 ```bash
-curl -X POST "http://localhost:8000/predict" \
+# Sur Hugging Face Spaces, remplacez localhost:7860 par l'URL de votre Space
+curl -X POST "http://localhost:7860/api/predict" \
   -H "Content-Type: application/json" \
   -d '{
     "AGE": 65,
@@ -63,6 +76,15 @@ curl -X POST "http://localhost:8000/predict" \
     "CHEST PAIN": 1,
     "CHRONIC DISEASE": 0
   }'
+```
+
+**Réponse :**
+```json
+{
+  "prediction": 1,
+  "probability": 0.87,
+  "message": "Risque élevé de cancer du poumon (probabilité: 87.0%)"
+}
 ```
 
 ## 📋 Features du modèle

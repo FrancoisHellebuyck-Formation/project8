@@ -10,6 +10,8 @@ import json
 
 import gradio as gr
 import requests
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 from ..config import settings
 from .logging_config import setup_ui_logger
@@ -214,6 +216,48 @@ def create_probability_bar(probability: float, error: bool = False) -> str:
     return html
 
 
+def api_health_proxy():
+    """Proxy vers l'endpoint /health de FastAPI."""
+    try:
+        response = requests.get(f"{settings.API_URL}/health", timeout=5)
+        return response.json(), response.status_code
+    except Exception as e:
+        return {"error": str(e)}, 503
+
+
+def api_predict_proxy(payload: dict):
+    """Proxy vers l'endpoint /predict de FastAPI."""
+    try:
+        response = requests.post(
+            f"{settings.API_URL}/predict", json=payload, timeout=10
+        )
+        return response.json(), response.status_code
+    except Exception as e:
+        return {"error": str(e)}, 503
+
+
+def api_predict_proba_proxy(payload: dict):
+    """Proxy vers l'endpoint /predict_proba de FastAPI."""
+    try:
+        response = requests.post(
+            f"{settings.API_URL}/predict_proba", json=payload, timeout=10
+        )
+        return response.json(), response.status_code
+    except Exception as e:
+        return {"error": str(e)}, 503
+
+
+def api_logs_proxy(limit: int = 100):
+    """Proxy vers l'endpoint /logs de FastAPI."""
+    try:
+        response = requests.get(
+            f"{settings.API_URL}/logs?limit={limit}", timeout=10
+        )
+        return response.json(), response.status_code
+    except Exception as e:
+        return {"error": str(e)}, 503
+
+
 def create_interface() -> gr.Blocks:
     """
     Crée l'interface Gradio.
@@ -348,11 +392,43 @@ def launch_ui(
     """
     interface = create_interface()
 
+    # Ajouter les routes API proxy vers FastAPI
+    @interface.app.get("/api/health")
+    async def health_endpoint():
+        """Endpoint proxy vers /health de FastAPI."""
+        result, status_code = api_health_proxy()
+        return JSONResponse(content=result, status_code=status_code)
+
+    @interface.app.post("/api/predict")
+    async def predict_endpoint(request: Request):
+        """Endpoint proxy vers /predict de FastAPI."""
+        payload = await request.json()
+        result, status_code = api_predict_proxy(payload)
+        return JSONResponse(content=result, status_code=status_code)
+
+    @interface.app.post("/api/predict_proba")
+    async def predict_proba_endpoint(request: Request):
+        """Endpoint proxy vers /predict_proba de FastAPI."""
+        payload = await request.json()
+        result, status_code = api_predict_proba_proxy(payload)
+        return JSONResponse(content=result, status_code=status_code)
+
+    @interface.app.get("/api/logs")
+    async def logs_endpoint(limit: int = 100):
+        """Endpoint proxy vers /logs de FastAPI."""
+        result, status_code = api_logs_proxy(limit)
+        return JSONResponse(content=result, status_code=status_code)
+
     host = server_name or settings.GRADIO_HOST
     port = server_port or settings.GRADIO_PORT
 
     print(f"🚀 Lancement de l'interface Gradio sur {host}:{port}")
     print(f"📡 API URL: {settings.API_URL}")
+    print("\n📍 Endpoints API proxy disponibles sur Gradio:")
+    print(f"   - GET  http://{host}:{port}/api/health")
+    print(f"   - POST http://{host}:{port}/api/predict")
+    print(f"   - POST http://{host}:{port}/api/predict_proba")
+    print(f"   - GET  http://{host}:{port}/api/logs?limit=100")
 
     interface.launch(server_name=host, server_port=port, share=share)
 
