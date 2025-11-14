@@ -32,59 +32,80 @@ L'interface Gradio est accessible directement sur le port principal. Elle permet
 
 ### API REST
 
-L'API FastAPI tourne en arrière-plan. Vous pouvez l'appeler via **deux méthodes** :
+L'API FastAPI tourne en arrière-plan. Vous pouvez l'utiliser de **deux façons** :
 
-#### Méthode 1 : Via les endpoints proxy Gradio (Port 7860)
+#### Méthode 1 : Via l'API Gradio (Recommandée pour HF Spaces)
 
-**Recommandé sur Hugging Face Spaces** - Tous les endpoints sont accessibles via le port principal :
+**Compatible Hugging Face Spaces** - Utilise l'API native de Gradio :
 
-- `GET /api/health` : État de santé de l'API
-- `POST /api/predict` : Prédiction binaire (0 ou 1)
-- `POST /api/predict_proba` : Prédiction avec probabilités
-- `GET /api/logs?limit=100` : Récupérer les logs
+```python
+from gradio_client import Client
 
-#### Méthode 2 : Accès direct FastAPI (Port 8000)
+client = Client("https://francoisformation-oc-project8.hf.space")
 
-**Disponible en développement local uniquement** :
+# Health check
+health = client.predict(api_name="/health")
 
-- `GET /` : Informations sur l'API
-- `GET /health` : État de santé de l'API
-- `POST /predict` : Prédiction binaire (0 ou 1)
-- `POST /predict_proba` : Prédiction avec probabilités
-- `GET /logs` : Récupérer les logs (limite configurable)
-- `DELETE /logs` : Supprimer les logs
+# Prédiction
+payload = {"AGE": 65, "GENDER": 1, "SMOKING": 1, ...}
+result = client.predict(payload, api_name="/predict_api")
 
-**Exemple de requête (via proxy Gradio) :**
-```bash
-# Sur Hugging Face Spaces, remplacez localhost:7860 par l'URL de votre Space
-curl -X POST "http://localhost:7860/api/predict" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "AGE": 65,
-    "GENDER": 1,
-    "SMOKING": 1,
-    "ALCOHOL CONSUMING": 1,
-    "PEER_PRESSURE": 0,
-    "YELLOW_FINGERS": 1,
-    "ANXIETY": 0,
-    "FATIGUE": 1,
-    "ALLERGY": 0,
-    "WHEEZING": 1,
-    "COUGHING": 1,
-    "SHORTNESS OF BREATH": 1,
-    "SWALLOWING DIFFICULTY": 0,
-    "CHEST PAIN": 1,
-    "CHRONIC DISEASE": 0
-  }'
+# Prédiction avec probabilités
+result_proba = client.predict(payload, api_name="/predict_proba_api")
+
+# Récupérer les logs (limite: 10)
+logs = client.predict(10, api_name="/logs_api")
 ```
 
-**Réponse :**
-```json
-{
-  "prediction": 1,
-  "probability": 0.87,
-  "message": "Risque élevé de cancer du poumon (probabilité: 87.0%)"
-}
+**Endpoints disponibles :**
+- `/api/health` : État de santé de l'API
+- `/api/predict_api` : Prédiction binaire (0 ou 1)
+- `/api/predict_proba_api` : Prédiction avec probabilités
+- `/api/logs_api` : Récupérer les logs
+
+#### Méthode 2 : Accès direct FastAPI (Développement local uniquement)
+
+**Non disponible sur HF Spaces** - L'API FastAPI tourne sur le port 8000 en local :
+
+```bash
+# Endpoints FastAPI (localhost uniquement)
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{...}'
+```
+
+**Exemple complet avec Python :**
+
+```python
+from gradio_client import Client
+
+# Connexion au Space
+client = Client("https://francoisformation-oc-project8.hf.space")
+
+# Prédiction
+result = client.predict(
+    {
+        "AGE": 65,
+        "GENDER": 1,
+        "SMOKING": 1,
+        "ALCOHOL CONSUMING": 1,
+        "PEER_PRESSURE": 0,
+        "YELLOW_FINGERS": 1,
+        "ANXIETY": 0,
+        "FATIGUE": 1,
+        "ALLERGY": 0,
+        "WHEEZING": 1,
+        "COUGHING": 1,
+        "SHORTNESS OF BREATH": 1,
+        "SWALLOWING DIFFICULTY": 0,
+        "CHEST PAIN": 1,
+        "CHRONIC DISEASE": 0
+    },
+    api_name="/predict_proba_api"
+)
+
+print(f"Prédiction: {result['prediction']}")
+print(f"Probabilité: {result['probability']:.2%}")
+print(f"Message: {result['message']}")
 ```
 
 ## 📋 Features du modèle
