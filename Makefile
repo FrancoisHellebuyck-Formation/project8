@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage test-api test-model run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive drift-analyze
 
 # Variables
 PYTHON := python
@@ -54,6 +54,14 @@ help:
 	@echo "  make logs             - Affiche les logs de l'API via endpoint"
 	@echo "  make health           - Vérifie la santé de l'API"
 	@echo "  make predict-test     - Test une prédiction"
+	@echo ""
+	@echo "$(GREEN)Simulation:$(NC)"
+	@echo "  make simulate         - Simule des requêtes (config depuis .env)"
+	@echo "  make simulate-quick   - Simule 20 requêtes avec 5 utilisateurs"
+	@echo "  make simulate-load    - Test de charge (500 requêtes, 50 users)"
+	@echo "  make simulate-drift   - Simule avec data drift immédiat (75 ans)"
+	@echo "  make simulate-drift-progressive - Drift progressif (50%-100%)"
+	@echo "  make drift-analyze    - Analyse le data drift"
 	@echo ""
 
 ## install: Installe les dépendances de production
@@ -236,8 +244,43 @@ predict-test:
 			"COUGHING": 1, \
 			"SHORTNESS OF BREATH": 1, \
 			"SWALLOWING DIFFICULTY": 0, \
-			"CHEST PAIN": 1 \
-		}' | $(PYTHON) -m json.tool
+			"CHEST PAIN": 1, \
+			"CHRONIC DISEASE": 0 \
+		}' | python3 -m json.tool
+
+## simulate: Simule des requêtes (utilise la config du .env)
+simulate:
+	@echo "$(BLUE)Simulation d'utilisateurs...$(NC)"
+	@$(UV) run python -m src.simulator
+
+## simulate-quick: Simule 20 requêtes avec 5 utilisateurs (override .env)
+simulate-quick:
+	@echo "$(BLUE)Simulation rapide...$(NC)"
+	@$(UV) run python -m src.simulator -r 20 -u 5 -v
+
+## simulate-load: Test de charge avec 500 requêtes et 50 utilisateurs (override .env)
+simulate-load:
+	@echo "$(BLUE)Test de charge...$(NC)"
+	@$(UV) run python -m src.simulator -r 500 -u 50
+
+## simulate-drift: Simule avec data drift immédiat sur l'âge (vers 75 ans)
+simulate-drift:
+	@echo "$(BLUE)Simulation avec data drift immédiat...$(NC)"
+	@echo "$(YELLOW)⚠️  Drift vers 75 ans sur toute la simulation$(NC)"
+	@$(UV) run python -m src.simulator -r 200 -u 10 --enable-age-drift \
+		--age-drift-target 75
+
+## simulate-drift-progressive: Drift progressif (50% à 100% de la simulation)
+simulate-drift-progressive:
+	@echo "$(BLUE)Simulation avec data drift progressif...$(NC)"
+	@echo "$(YELLOW)⚠️  Drift vers 80 ans entre 50% et 100%$(NC)"
+	@$(UV) run python -m src.simulator -r 300 -u 15 --enable-age-drift \
+		--age-drift-target 80 --age-drift-start 50 --age-drift-end 100
+
+## drift-analyze: Analyse le comportement du data drift
+drift-analyze:
+	@echo "$(BLUE)Analyse du data drift...$(NC)"
+	@$(UV) run python -m src.simulator.drift_analyzer
 
 ## setup: Configuration initiale du projet
 setup: install-dev

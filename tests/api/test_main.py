@@ -10,7 +10,6 @@ Ce module teste tous les endpoints de l'API:
 - DELETE /logs
 """
 
-import pytest
 from fastapi import status
 
 

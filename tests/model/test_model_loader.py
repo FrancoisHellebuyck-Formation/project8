@@ -8,8 +8,6 @@ Ce module teste:
 - ModelLoader.is_loaded()
 """
 
-import pickle
-from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
