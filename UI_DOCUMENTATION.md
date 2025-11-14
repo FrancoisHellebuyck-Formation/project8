@@ -136,6 +136,129 @@ POST http://localhost:8000/predict
 }
 ```
 
+### Endpoints API Proxy
+
+Gradio expose maintenant des **endpoints API proxy** qui redirigent vers l'API FastAPI. Cela permet d'accéder à l'API via le port Gradio (7860) au lieu du port FastAPI (8000).
+
+**Endpoints disponibles :**
+
+#### 1. Health Check
+```bash
+GET http://localhost:7860/api/health
+```
+
+**Exemple :**
+```bash
+curl http://localhost:7860/api/health
+```
+
+**Réponse :**
+```json
+{
+  "status": "healthy",
+  "model_loaded": true,
+  "redis_connected": true
+}
+```
+
+#### 2. Prédiction binaire
+```bash
+POST http://localhost:7860/api/predict
+```
+
+**Exemple :**
+```bash
+curl -X POST http://localhost:7860/api/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "AGE": 65,
+    "GENDER": 1,
+    "SMOKING": 1,
+    "ALCOHOL CONSUMING": 1,
+    "PEER_PRESSURE": 0,
+    "YELLOW_FINGERS": 1,
+    "ANXIETY": 0,
+    "FATIGUE": 1,
+    "ALLERGY": 0,
+    "WHEEZING": 1,
+    "COUGHING": 1,
+    "SHORTNESS OF BREATH": 1,
+    "SWALLOWING DIFFICULTY": 0,
+    "CHEST PAIN": 1,
+    "CHRONIC DISEASE": 0
+  }'
+```
+
+**Réponse :**
+```json
+{
+  "prediction": 1,
+  "message": "Risque élevé de cancer du poumon"
+}
+```
+
+#### 3. Prédiction avec probabilités
+```bash
+POST http://localhost:7860/api/predict_proba
+```
+
+**Exemple :**
+```bash
+curl -X POST http://localhost:7860/api/predict_proba \
+  -H "Content-Type: application/json" \
+  -d '{...}'  # Même payload que /predict
+```
+
+**Réponse :**
+```json
+{
+  "prediction": 1,
+  "probability": 0.87,
+  "message": "Risque élevé de cancer du poumon (probabilité: 87.0%)"
+}
+```
+
+#### 4. Récupération des logs
+```bash
+GET http://localhost:7860/api/logs?limit=100
+```
+
+**Exemple :**
+```bash
+curl "http://localhost:7860/api/logs?limit=10"
+```
+
+**Réponse :**
+```json
+{
+  "logs": [
+    "2025-01-14 10:30:15 - INFO - Prediction received",
+    "2025-01-14 10:30:16 - INFO - Model prediction: 1"
+  ],
+  "count": 2
+}
+```
+
+### Avantages des endpoints proxy
+
+1. **Un seul port à exposer** : En production (HuggingFace Spaces), seul le port 7860 (Gradio) est exposé
+2. **Simplification du déploiement** : Pas besoin d'exposer le port FastAPI (8000) publiquement
+3. **Accès unifié** : Toute l'application accessible via une seule URL
+4. **Sécurité renforcée** : L'API FastAPI reste en backend (localhost uniquement)
+
+### Tester les endpoints proxy
+
+Un script de test est fourni :
+
+```bash
+# Lancer l'API et Gradio
+make run-api &
+make run-ui &
+
+# Tester les endpoints proxy
+python test_gradio_endpoints.py
+```
+
 ### Gestion des erreurs
 
 L'interface gère automatiquement plusieurs types d'erreurs :
