@@ -375,83 +375,190 @@ def create_interface() -> gr.Blocks:
         )
 
         # === API Endpoints via Gradio (compatibles HF Spaces) ===
-        gr.Markdown("### 🔌 API Endpoints")
+        gr.Markdown(
+            """
+            ---
+            ### 🔌 API Endpoints
 
-        with gr.Accordion("API Documentation", open=False):
+            Testez les endpoints de l'API directement depuis cette interface.
+            Ces endpoints sont également accessibles via l'API Gradio
+            (voir documentation ci-dessous).
+            """
+        )
+
+        with gr.Accordion("🩺 Health Check", open=False):
             gr.Markdown(
                 """
-                Les endpoints suivants sont accessibles via l'API Gradio :
-                - `/api/health` : Health check
-                - `/api/predict_api` : Prédiction avec JSON
-                - `/api/predict_proba_api` : Prédiction avec probabilités
-                - `/api/logs_api` : Récupération des logs
+                Vérifie l'état de santé de l'API, du modèle et de Redis.
+
+                **API Gradio:** `/api/health`
                 """
             )
+            with gr.Row():
+                health_btn = gr.Button("🔍 Vérifier l'état", variant="secondary")
+                health_output = gr.JSON(label="Statut de l'API")
 
-            # Health check endpoint
-            with gr.Row(visible=False):
-                health_trigger = gr.Button("health")
-                health_output = gr.JSON()
-                health_trigger.click(
-                    fn=lambda: api_health_proxy()[0],
-                    inputs=None,
-                    outputs=health_output,
-                    api_name="health"
-                )
+            def health_check_wrapper():
+                """Wrapper pour le health check."""
+                result, _ = api_health_proxy()
+                return result
 
-            # Predict endpoint (JSON input/output)
-            with gr.Row(visible=False):
-                predict_json_input = gr.JSON()
-                predict_json_output = gr.JSON()
-                predict_btn_api = gr.Button("predict")
+            health_btn.click(
+                fn=health_check_wrapper,
+                inputs=None,
+                outputs=health_output,
+                api_name="health"
+            )
 
-                def predict_api_wrapper(data):
-                    """Wrapper pour l'API de prédiction."""
-                    result, _ = api_predict_proxy(data)
-                    return result
+        with gr.Accordion("🎯 Prédiction (JSON)", open=False):
+            gr.Markdown(
+                """
+                Effectue une prédiction binaire (0 ou 1) à partir d'un JSON.
 
-                predict_btn_api.click(
-                    fn=predict_api_wrapper,
-                    inputs=predict_json_input,
-                    outputs=predict_json_output,
-                    api_name="predict_api"
-                )
+                **API Gradio:** `/api/predict_api`
 
-            # Predict proba endpoint
-            with gr.Row(visible=False):
-                predict_proba_input = gr.JSON()
-                predict_proba_output = gr.JSON()
-                predict_proba_btn = gr.Button("predict_proba")
+                **Format du JSON:**
+                ```json
+                {
+                  "AGE": 65,
+                  "GENDER": 1,
+                  "SMOKING": 1,
+                  "ALCOHOL CONSUMING": 1,
+                  "PEER_PRESSURE": 0,
+                  "YELLOW_FINGERS": 1,
+                  "ANXIETY": 0,
+                  "FATIGUE": 1,
+                  "ALLERGY": 0,
+                  "WHEEZING": 1,
+                  "COUGHING": 1,
+                  "SHORTNESS OF BREATH": 1,
+                  "SWALLOWING DIFFICULTY": 0,
+                  "CHEST PAIN": 1,
+                  "CHRONIC DISEASE": 0
+                }
+                ```
+                """
+            )
+            with gr.Row():
+                with gr.Column():
+                    predict_json_input = gr.JSON(
+                        label="Données patient (JSON)",
+                        value={
+                            "AGE": 65,
+                            "GENDER": 1,
+                            "SMOKING": 1,
+                            "ALCOHOL CONSUMING": 1,
+                            "PEER_PRESSURE": 0,
+                            "YELLOW_FINGERS": 1,
+                            "ANXIETY": 0,
+                            "FATIGUE": 1,
+                            "ALLERGY": 0,
+                            "WHEEZING": 1,
+                            "COUGHING": 1,
+                            "SHORTNESS OF BREATH": 1,
+                            "SWALLOWING DIFFICULTY": 0,
+                            "CHEST PAIN": 1,
+                            "CHRONIC DISEASE": 0
+                        }
+                    )
+                    predict_btn_api = gr.Button(
+                        "🔮 Prédire", variant="primary"
+                    )
+                with gr.Column():
+                    predict_json_output = gr.JSON(label="Résultat")
 
-                def predict_proba_api_wrapper(data):
-                    """Wrapper pour l'API predict_proba."""
-                    result, _ = api_predict_proba_proxy(data)
-                    return result
+            def predict_api_wrapper(data):
+                """Wrapper pour l'API de prédiction."""
+                result, _ = api_predict_proxy(data)
+                return result
 
-                predict_proba_btn.click(
-                    fn=predict_proba_api_wrapper,
-                    inputs=predict_proba_input,
-                    outputs=predict_proba_output,
-                    api_name="predict_proba_api"
-                )
+            predict_btn_api.click(
+                fn=predict_api_wrapper,
+                inputs=predict_json_input,
+                outputs=predict_json_output,
+                api_name="predict_api"
+            )
 
-            # Logs endpoint
-            with gr.Row(visible=False):
-                logs_limit_input = gr.Number(value=100, visible=False)
-                logs_output = gr.JSON()
-                logs_btn = gr.Button("logs")
+        with gr.Accordion("📊 Prédiction avec probabilités (JSON)", open=False):
+            gr.Markdown(
+                """
+                Effectue une prédiction avec probabilité détaillée.
 
-                def logs_api_wrapper(limit):
-                    """Wrapper pour l'API des logs."""
-                    result, _ = api_logs_proxy(int(limit))
-                    return result
+                **API Gradio:** `/api/predict_proba_api`
+                """
+            )
+            with gr.Row():
+                with gr.Column():
+                    predict_proba_input = gr.JSON(
+                        label="Données patient (JSON)",
+                        value={
+                            "AGE": 65,
+                            "GENDER": 1,
+                            "SMOKING": 1,
+                            "ALCOHOL CONSUMING": 1,
+                            "PEER_PRESSURE": 0,
+                            "YELLOW_FINGERS": 1,
+                            "ANXIETY": 0,
+                            "FATIGUE": 1,
+                            "ALLERGY": 0,
+                            "WHEEZING": 1,
+                            "COUGHING": 1,
+                            "SHORTNESS OF BREATH": 1,
+                            "SWALLOWING DIFFICULTY": 0,
+                            "CHEST PAIN": 1,
+                            "CHRONIC DISEASE": 0
+                        }
+                    )
+                    predict_proba_btn = gr.Button(
+                        "🔮 Prédire avec probabilités", variant="primary"
+                    )
+                with gr.Column():
+                    predict_proba_output = gr.JSON(label="Résultat")
 
-                logs_btn.click(
-                    fn=logs_api_wrapper,
-                    inputs=logs_limit_input,
-                    outputs=logs_output,
-                    api_name="logs_api"
-                )
+            def predict_proba_api_wrapper(data):
+                """Wrapper pour l'API predict_proba."""
+                result, _ = api_predict_proba_proxy(data)
+                return result
+
+            predict_proba_btn.click(
+                fn=predict_proba_api_wrapper,
+                inputs=predict_proba_input,
+                outputs=predict_proba_output,
+                api_name="predict_proba_api"
+            )
+
+        with gr.Accordion("📝 Logs de l'API", open=False):
+            gr.Markdown(
+                """
+                Récupère les derniers logs de l'API.
+
+                **API Gradio:** `/api/logs_api`
+                """
+            )
+            with gr.Row():
+                with gr.Column(scale=1):
+                    logs_limit_input = gr.Slider(
+                        minimum=1,
+                        maximum=100,
+                        value=10,
+                        step=1,
+                        label="Nombre de logs à récupérer"
+                    )
+                    logs_btn = gr.Button("📋 Récupérer les logs", variant="secondary")
+                with gr.Column(scale=2):
+                    logs_output = gr.JSON(label="Logs")
+
+            def logs_api_wrapper(limit):
+                """Wrapper pour l'API des logs."""
+                result, _ = api_logs_proxy(int(limit))
+                return result
+
+            logs_btn.click(
+                fn=logs_api_wrapper,
+                inputs=logs_limit_input,
+                outputs=logs_output,
+                api_name="logs_api"
+            )
 
     return interface
 
@@ -473,13 +580,18 @@ def launch_ui(
     port = server_port or settings.GRADIO_PORT
 
     print(f"🚀 Lancement de l'interface Gradio sur {host}:{port}")
-    print(f"📡 API URL: {settings.API_URL}")
-    print("\n📍 Endpoints API Gradio disponibles:")
-    print("   - /api/health (via API Gradio)")
-    print("   - /api/predict_api (via API Gradio)")
-    print("   - /api/predict_proba_api (via API Gradio)")
-    print("   - /api/logs_api (via API Gradio)")
-    print(f"\n💡 Documentation API: http://{host}:{port}/ (voir section API)")
+    print(f"📡 API Backend: {settings.API_URL}")
+    print("\n📍 Fonctionnalités disponibles:")
+    print("   ✅ Interface de prédiction interactive")
+    print("   ✅ Section API Endpoints (testez l'API directement)")
+    print("   ✅ Health check, prédictions JSON, logs")
+    print("\n📍 API Gradio (pour intégration programmatique):")
+    print("   - /api/health")
+    print("   - /api/predict_api")
+    print("   - /api/predict_proba_api")
+    print("   - /api/logs_api")
+    print(f"\n💡 Interface web: http://{host}:{port}")
+    print("💡 Documentation: Voir section 'API Endpoints' dans l'interface")
 
     interface.launch(server_name=host, server_port=port, share=share)
 
