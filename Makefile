@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage test-api test-model run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive drift-analyze
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive drift-analyze
 
 # Variables
 PYTHON := python
@@ -12,6 +12,8 @@ API_HOST := 0.0.0.0
 API_PORT := 8000
 GRADIO_HOST := 0.0.0.0
 GRADIO_PORT := 7860
+GRADIO_LOCAL_URL := http://localhost:7860
+GRADIO_HF_URL := https://francoisformation-oc-project8.hf.space
 REDIS_PORT := 6379
 
 # Couleurs pour l'affichage
@@ -37,6 +39,8 @@ help:
 	@echo "  make test-coverage    - Lance les tests avec couverture"
 	@echo "  make test-api         - Lance les tests de l'API uniquement"
 	@echo "  make test-model       - Lance les tests du modèle uniquement"
+	@echo "  make test-gradio-api-local  - Test l'API Gradio (local)"
+	@echo "  make test-gradio-api-hf     - Test l'API Gradio (HuggingFace)"
 	@echo ""
 	@echo "$(GREEN)Développement:$(NC)"
 	@echo "  make run-api          - Lance l'API FastAPI"
@@ -134,6 +138,23 @@ test-model:
 	@$(UV) run pytest tests/model/ -v || \
 		(echo "$(RED)✗ Tests modèle échoués$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Tests modèle passent$(NC)"
+
+## test-gradio-api-local: Test l'API Gradio en local
+test-gradio-api-local:
+	@echo "$(BLUE)Test de l'API Gradio (local)...$(NC)"
+	@echo "$(YELLOW)URL: $(GRADIO_LOCAL_URL)$(NC)"
+	@echo "$(YELLOW)Assurez-vous que l'API et Gradio tournent localement$(NC)"
+	@GRADIO_URL=$(GRADIO_LOCAL_URL) $(PYTHON) test_gradio_api.py || \
+		(echo "$(RED)✗ Tests Gradio API échoués$(NC)" && exit 1)
+	@echo "$(GREEN)✓ Tests Gradio API passent$(NC)"
+
+## test-gradio-api-hf: Test l'API Gradio sur HuggingFace Spaces
+test-gradio-api-hf:
+	@echo "$(BLUE)Test de l'API Gradio (HuggingFace Spaces)...$(NC)"
+	@echo "$(YELLOW)URL: $(GRADIO_HF_URL)$(NC)"
+	@GRADIO_URL=$(GRADIO_HF_URL) $(PYTHON) test_gradio_api.py || \
+		(echo "$(RED)✗ Tests Gradio API échoués$(NC)" && exit 1)
+	@echo "$(GREEN)✓ Tests Gradio API passent$(NC)"
 
 ## run-api: Lance l'API FastAPI
 run-api:

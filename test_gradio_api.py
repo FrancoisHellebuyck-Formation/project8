@@ -4,15 +4,29 @@ Script de test pour les endpoints Gradio API (compatibles HF Spaces).
 
 Ce script teste les endpoints via l'API native de Gradio qui fonctionne
 aussi bien en local que sur Hugging Face Spaces.
+
+Usage:
+    # Local (par défaut)
+    python test_gradio_api.py
+
+    # HuggingFace Spaces
+    GRADIO_URL=https://francoisformation-oc-project8.hf.space python test_gradio_api.py
+
+    # Via Makefile
+    make test-gradio-api-local
+    make test-gradio-api-hf
 """
 
 import json
+import os
 
 from gradio_client import Client
 
-# Configuration
-GRADIO_URL = "http://localhost:7860"  # Local
-# GRADIO_URL = "https://francoisformation-oc-project8.hf.space"  # HF Spaces
+# Configuration: priorité à la variable d'environnement GRADIO_URL
+GRADIO_URL = os.environ.get(
+    "GRADIO_URL",
+    "http://localhost:7860"  # Valeur par défaut: local
+)
 
 # Payload de test
 test_payload = {
@@ -43,11 +57,11 @@ def test_health():
     try:
         client = Client(GRADIO_URL)
         result = client.predict(api_name="/health")
-        print(f"Status: ✅ SUCCESS")
+        print("Status: ✅ SUCCESS")
         print(f"Response: {json.dumps(result, indent=2)}")
         return True
     except Exception as e:
-        print(f"Status: ❌ FAIL")
+        print("Status: ❌ FAIL")
         print(f"Error: {e}")
         return False
 
@@ -61,12 +75,12 @@ def test_predict_api():
     try:
         client = Client(GRADIO_URL)
         result = client.predict(test_payload, api_name="/predict_api")
-        print(f"Status: ✅ SUCCESS")
+        print("Status: ✅ SUCCESS")
         print(f"Payload: {json.dumps(test_payload, indent=2)}")
         print(f"Response: {json.dumps(result, indent=2)}")
         return True
     except Exception as e:
-        print(f"Status: ❌ FAIL")
+        print("Status: ❌ FAIL")
         print(f"Error: {e}")
         return False
 
@@ -80,11 +94,11 @@ def test_predict_proba_api():
     try:
         client = Client(GRADIO_URL)
         result = client.predict(test_payload, api_name="/predict_proba_api")
-        print(f"Status: ✅ SUCCESS")
+        print("Status: ✅ SUCCESS")
         print(f"Response: {json.dumps(result, indent=2)}")
         return True
     except Exception as e:
-        print(f"Status: ❌ FAIL")
+        print("Status: ❌ FAIL")
         print(f"Error: {e}")
         return False
 
@@ -98,12 +112,12 @@ def test_logs_api():
     try:
         client = Client(GRADIO_URL)
         result = client.predict(10, api_name="/logs_api")
-        print(f"Status: ✅ SUCCESS")
+        print("Status: ✅ SUCCESS")
         print(f"Response (logs count): {len(result.get('logs', []))}")
         print(f"Response (extrait): {json.dumps(result, indent=2)[:500]}...")
         return True
     except Exception as e:
-        print(f"Status: ❌ FAIL")
+        print("Status: ❌ FAIL")
         print(f"Error: {e}")
         return False
 
@@ -139,7 +153,7 @@ def main():
 
     if passed == total:
         print("\n🎉 Tous les tests ont réussi !")
-        print(f"\n📍 Pour tester sur HF Spaces, changez GRADIO_URL dans le script")
+        print("\n📍 Pour tester sur HF Spaces, utilisez make test-gradio-api-hf")
         return 0
     else:
         print("\n⚠️ Certains tests ont échoué")
