@@ -54,6 +54,7 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
     "httpx>=0.28.0",
+    "gradio-client>=1.13.3",
 ]
 
 [tool.pytest.ini_options]

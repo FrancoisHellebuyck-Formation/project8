@@ -108,6 +108,22 @@ print(f"Probabilité: {result['probability']:.2%}")
 print(f"Message: {result['message']}")
 ```
 
+### 🧪 Tests automatisés
+
+Un script de test complet est fourni pour valider tous les endpoints :
+
+```bash
+# Test en local (nécessite API + Gradio lancés)
+make test-gradio-api-local
+
+# Test sur HuggingFace Spaces
+make test-gradio-api-hf
+
+# Ou directement avec Python
+python test_gradio_api.py  # Local par défaut
+GRADIO_URL=https://francoisformation-oc-project8.hf.space python test_gradio_api.py
+```
+
 ## 📋 Features du modèle
 
 **15 features d'entrée :**
