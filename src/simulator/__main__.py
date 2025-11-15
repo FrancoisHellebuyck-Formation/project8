@@ -20,10 +20,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemples:
-  # Simulation simple avec 100 requêtes et 10 utilisateurs
+  # Simulation simple avec 100 requêtes et 10 utilisateurs (FastAPI)
   python -m src.simulator --requests 100 --users 10
 
-  # Simulation avec API distante et verbose
+  # Simulation via Gradio API en local
+  python -m src.simulator --use-gradio --gradio-url http://localhost:7860 -r 100 -u 10
+
+  # Simulation via HuggingFace Spaces (Space public)
+  python -m src.simulator --use-gradio --gradio-url https://francoisformation-oc-project8.hf.space -r 50 -u 5
+
+  # Simulation via HuggingFace Spaces (Space privé avec token)
+  python -m src.simulator --use-gradio --gradio-url https://francoisformation-oc-project8.hf.space --hf-token hf_xxx -r 50 -u 5
+
+  # Simulation avec API distante et verbose (FastAPI)
   python -m src.simulator --url http://api.example.com:8000 --requests 50 -v
 
   # Test de charge avec 1000 requêtes et 50 utilisateurs
@@ -41,11 +50,33 @@ Exemples:
         """,
     )
 
+    # Mode de simulation
+    parser.add_argument(
+        "--use-gradio",
+        action="store_true",
+        default=False,
+        help="Utilise l'API Gradio au lieu de l'API FastAPI directe",
+    )
+
+    parser.add_argument(
+        "--gradio-url",
+        type=str,
+        default=None,
+        help="URL Gradio (défaut: http://localhost:7860 si --use-gradio)",
+    )
+
+    parser.add_argument(
+        "--hf-token",
+        type=str,
+        default=None,
+        help="Token HuggingFace pour accès aux Spaces privés",
+    )
+
     parser.add_argument(
         "--url",
         type=str,
         default=settings.SIMULATOR_API_URL,
-        help=f"URL de base de l'API (défaut: {settings.SIMULATOR_API_URL})",
+        help=f"URL de base de l'API FastAPI (défaut: {settings.SIMULATOR_API_URL})",
     )
 
     parser.add_argument(
@@ -181,6 +212,9 @@ Exemples:
         timeout=args.timeout,
         endpoint=args.endpoint,
         verbose=args.verbose,
+        use_gradio=args.use_gradio,
+        gradio_url=args.gradio_url,
+        hf_token=args.hf_token,
         enable_age_drift=args.enable_age_drift,
         age_drift_target_mean=args.age_drift_target,
         age_drift_start_pct=args.age_drift_start,
@@ -191,6 +225,15 @@ Exemples:
     print("\n" + "=" * 60)
     print("  SIMULATEUR D'UTILISATEURS - API DE PRÉDICTION ML")
     print("=" * 60)
+
+    # Afficher le mode de simulation
+    if args.use_gradio:
+        gradio_url = args.gradio_url or "http://localhost:7860"
+        print(f"\n🔌 Mode: Gradio API ({gradio_url})")
+        if args.hf_token:
+            print("🔐 Token HuggingFace: Configuré")
+    else:
+        print(f"\n🔌 Mode: FastAPI directe ({args.url})")
 
     # Afficher un avertissement si le drift est activé
     if args.enable_age_drift:

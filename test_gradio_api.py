@@ -9,8 +9,11 @@ Usage:
     # Local (par défaut)
     python test_gradio_api.py
 
-    # HuggingFace Spaces
+    # HuggingFace Spaces (public)
     GRADIO_URL=https://francoisformation-oc-project8.hf.space python test_gradio_api.py
+
+    # HuggingFace Spaces (privé - nécessite un token)
+    HF_TOKEN=your_token GRADIO_URL=https://francoisformation-oc-project8.hf.space python test_gradio_api.py
 
     # Via Makefile
     make test-gradio-api-local
@@ -27,6 +30,9 @@ GRADIO_URL = os.environ.get(
     "GRADIO_URL",
     "http://localhost:7860"  # Valeur par défaut: local
 )
+
+# Token HuggingFace pour les Spaces privés (optionnel)
+HF_TOKEN = os.environ.get("HF_TOKEN", None)
 
 # Payload de test
 test_payload = {
@@ -55,7 +61,7 @@ def test_health():
     print("=" * 60)
 
     try:
-        client = Client(GRADIO_URL)
+        client = Client(GRADIO_URL, hf_token=HF_TOKEN)
         result = client.predict(api_name="/health")
         print("Status: ✅ SUCCESS")
         print(f"Response: {json.dumps(result, indent=2)}")
@@ -73,7 +79,7 @@ def test_predict_api():
     print("=" * 60)
 
     try:
-        client = Client(GRADIO_URL)
+        client = Client(GRADIO_URL, hf_token=HF_TOKEN)
         result = client.predict(test_payload, api_name="/predict_api")
         print("Status: ✅ SUCCESS")
         print(f"Payload: {json.dumps(test_payload, indent=2)}")
@@ -92,7 +98,7 @@ def test_predict_proba_api():
     print("=" * 60)
 
     try:
-        client = Client(GRADIO_URL)
+        client = Client(GRADIO_URL, hf_token=HF_TOKEN)
         result = client.predict(test_payload, api_name="/predict_proba_api")
         print("Status: ✅ SUCCESS")
         print(f"Response: {json.dumps(result, indent=2)}")
@@ -110,7 +116,7 @@ def test_logs_api():
     print("=" * 60)
 
     try:
-        client = Client(GRADIO_URL)
+        client = Client(GRADIO_URL, hf_token=HF_TOKEN)
         result = client.predict(10, api_name="/logs_api")
         print("Status: ✅ SUCCESS")
         print(f"Response (logs count): {len(result.get('logs', []))}")
@@ -126,10 +132,23 @@ def main():
     """Exécute tous les tests."""
     print("\n🧪 Tests des endpoints Gradio API")
     print(f"URL: {GRADIO_URL}")
-    print("\nAssurez-vous que:")
-    print("1. L'API FastAPI tourne sur http://localhost:8000")
-    print("2. L'interface Gradio tourne sur http://localhost:7860")
-    print("3. Redis est accessible")
+
+    if HF_TOKEN:
+        print("🔐 Token HuggingFace: Configuré (Space privé)")
+    else:
+        print("🔓 Token HuggingFace: Non configuré (Space public ou local)")
+
+    if "localhost" in GRADIO_URL or "127.0.0.1" in GRADIO_URL:
+        print("\nAssurez-vous que:")
+        print("1. L'API FastAPI tourne sur http://localhost:8000")
+        print("2. L'interface Gradio tourne sur http://localhost:7860")
+        print("3. Redis est accessible")
+    elif "hf.space" in GRADIO_URL or "huggingface" in GRADIO_URL:
+        print("\n📍 Test sur HuggingFace Spaces")
+        if not HF_TOKEN:
+            print("⚠️  Si le Space est privé, définissez HF_TOKEN")
+    else:
+        print("\n📍 Test sur une URL personnalisée")
 
     results = {
         "Health": test_health(),
