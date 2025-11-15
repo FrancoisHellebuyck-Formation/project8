@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf drift-analyze
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze
 
 # Variables
 PYTHON := python
@@ -59,14 +59,21 @@ help:
 	@echo "  make health           - Vérifie la santé de l'API"
 	@echo "  make predict-test     - Test une prédiction"
 	@echo ""
-	@echo "$(GREEN)Simulation:$(NC)"
+	@echo "$(GREEN)Simulation FastAPI:$(NC)"
 	@echo "  make simulate         - Simule des requêtes (config depuis .env)"
 	@echo "  make simulate-quick   - Simule 20 requêtes avec 5 utilisateurs"
 	@echo "  make simulate-load    - Test de charge (500 requêtes, 50 users)"
 	@echo "  make simulate-drift   - Simule avec data drift immédiat (75 ans)"
 	@echo "  make simulate-drift-progressive - Drift progressif (50%-100%)"
+	@echo ""
+	@echo "$(GREEN)Simulation Gradio:$(NC)"
 	@echo "  make simulate-gradio-local - Simule via Gradio API (local)"
 	@echo "  make simulate-gradio-hf - Simule via Gradio API (HF Spaces)"
+	@echo "  make simulate-gradio-drift-local - Drift Gradio local (75 ans)"
+	@echo "  make simulate-gradio-drift-hf - Drift Gradio HF (75 ans)"
+	@echo "  make simulate-gradio-drift-progressive-hf - Drift progressif HF (50%-100%)"
+	@echo ""
+	@echo "$(GREEN)Analyse:$(NC)"
 	@echo "  make drift-analyze    - Analyse le data drift"
 	@echo ""
 
@@ -307,6 +314,45 @@ simulate-drift-progressive:
 	@echo "$(YELLOW)⚠️  Drift vers 80 ans entre 50% et 100%$(NC)"
 	@$(UV) run python -m src.simulator -r 300 -u 15 --enable-age-drift \
 		--age-drift-target 80 --age-drift-start 50 --age-drift-end 100
+
+## simulate-gradio-drift-local: Drift via Gradio local (vers 75 ans)
+simulate-gradio-drift-local:
+	@echo "$(BLUE)Simulation Gradio avec data drift (local)...$(NC)"
+	@echo "$(YELLOW)⚠️  Drift vers 75 ans sur toute la simulation$(NC)"
+	@$(UV) run python -m src.simulator --use-gradio --gradio-url $(GRADIO_LOCAL_URL) \
+		-r 200 -u 10 --enable-age-drift --age-drift-target 75 -v
+
+## simulate-gradio-drift-hf: Drift via Gradio HF Spaces (vers 75 ans)
+simulate-gradio-drift-hf:
+	@echo "$(BLUE)Simulation Gradio avec data drift (HF Spaces)...$(NC)"
+	@echo "$(YELLOW)⚠️  Drift vers 75 ans sur toute la simulation$(NC)"
+	@if [ -f .env ]; then \
+		echo "$(YELLOW)Chargement de HF_TOKEN depuis .env...$(NC)"; \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		$(UV) run python -m src.simulator --use-gradio --gradio-url $(GRADIO_HF_URL) \
+			--hf-token $$HF_TOKEN -r 200 -u 10 --enable-age-drift --age-drift-target 75 -v; \
+	else \
+		echo "$(YELLOW)⚠️  Fichier .env non trouvé, test sans token$(NC)"; \
+		$(UV) run python -m src.simulator --use-gradio --gradio-url $(GRADIO_HF_URL) \
+			-r 200 -u 10 --enable-age-drift --age-drift-target 75 -v; \
+	fi
+
+## simulate-gradio-drift-progressive-hf: Drift progressif via Gradio HF (50%-100%)
+simulate-gradio-drift-progressive-hf:
+	@echo "$(BLUE)Simulation Gradio avec drift progressif (HF Spaces)...$(NC)"
+	@echo "$(YELLOW)⚠️  Drift vers 80 ans entre 50% et 100%$(NC)"
+	@if [ -f .env ]; then \
+		echo "$(YELLOW)Chargement de HF_TOKEN depuis .env...$(NC)"; \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		$(UV) run python -m src.simulator --use-gradio --gradio-url $(GRADIO_HF_URL) \
+			--hf-token $$HF_TOKEN -r 300 -u 15 --enable-age-drift \
+			--age-drift-target 80 --age-drift-start 50 --age-drift-end 100 -v; \
+	else \
+		echo "$(YELLOW)⚠️  Fichier .env non trouvé, test sans token$(NC)"; \
+		$(UV) run python -m src.simulator --use-gradio --gradio-url $(GRADIO_HF_URL) \
+			-r 300 -u 15 --enable-age-drift \
+			--age-drift-target 80 --age-drift-start 50 --age-drift-end 100 -v; \
+	fi
 
 ## drift-analyze: Analyse le comportement du data drift
 drift-analyze:

@@ -114,6 +114,43 @@ python -m src.simulator --use-gradio --gradio-url http://localhost:7860 -r 20 -u
 - Les endpoints sont mappés automatiquement : `/predict` → `/predict_api`, `/predict_proba` → `/predict_proba_api`
 - Les requêtes sont exécutées de manière concurrente via `ThreadPoolExecutor`
 
+### 🔌🔄 Mode Gradio avec Data Drift
+
+Vous pouvez combiner le mode Gradio avec la simulation de data drift pour tester la robustesse du modèle déployé sur HuggingFace Spaces.
+
+```bash
+# Drift via Gradio local (vers 75 ans)
+python -m src.simulator --use-gradio --gradio-url http://localhost:7860 \
+    -r 200 -u 10 --enable-age-drift --age-drift-target 75 -v
+
+# Ou utiliser le Makefile
+make simulate-gradio-drift-local
+
+# Drift via HuggingFace Spaces (vers 75 ans)
+python -m src.simulator --use-gradio \
+    --gradio-url https://francoisformation-oc-project8.hf.space \
+    --hf-token hf_xxxxxxxxxxxxxxxxxxxxx \
+    -r 200 -u 10 --enable-age-drift --age-drift-target 75 -v
+
+# Ou utiliser le Makefile (charge HF_TOKEN depuis .env)
+make simulate-gradio-drift-hf
+
+# Drift progressif via HuggingFace Spaces (50% à 100%)
+python -m src.simulator --use-gradio \
+    --gradio-url https://francoisformation-oc-project8.hf.space \
+    --hf-token hf_xxxxxxxxxxxxxxxxxxxxx \
+    -r 300 -u 15 --enable-age-drift \
+    --age-drift-target 80 --age-drift-start 50 --age-drift-end 100 -v
+
+# Ou utiliser le Makefile
+make simulate-gradio-drift-progressive-hf
+```
+
+**Cas d'usage :**
+- Tester la robustesse du modèle en production (HF Spaces) face au data drift
+- Valider que le modèle déployé gère bien les changements de distribution
+- Comparer les performances du modèle en local vs déployé avec drift
+
 ### 🔄 Simulation de Data Drift
 
 Le simulateur peut générer un data drift progressif sur l'âge des patients pour tester la robustesse du modèle face aux changements de distribution des données.
@@ -279,35 +316,81 @@ asyncio.run(main())
 
 ## 📈 Cas d'usage
 
-### 1. Test de charge basique
+### Mode FastAPI (local)
+
+#### 1. Test de charge basique
 Vérifier que l'API peut gérer un nombre modéré de requêtes :
 ```bash
 python -m src.simulator -r 100 -u 10
 ```
 
-### 2. Test de performance
+#### 2. Test de performance
 Mesurer les temps de réponse sous charge :
 ```bash
 python -m src.simulator -r 500 -u 50 -v
 ```
 
-### 3. Test de stress
+#### 3. Test de stress
 Tester les limites de l'API :
 ```bash
 python -m src.simulator -r 2000 -u 200 --timeout 120
 ```
 
-### 4. Test de stabilité
+#### 4. Test de stabilité
 Vérifier la stabilité sur une longue période avec délai :
 ```bash
 python -m src.simulator -r 1000 -u 5 --delay 0.5
 ```
 
-### 5. Comparaison des endpoints
+#### 5. Comparaison des endpoints
 Comparer les performances de `/predict` et `/predict_proba` :
 ```bash
 python -m src.simulator -r 100 -u 10 -e /predict
 python -m src.simulator -r 100 -u 10 -e /predict_proba
+```
+
+### Mode Gradio (production)
+
+#### 6. Test de production HuggingFace Spaces
+Tester le modèle déployé en production :
+```bash
+make simulate-gradio-hf
+# ou
+python -m src.simulator --use-gradio \
+    --gradio-url https://francoisformation-oc-project8.hf.space \
+    --hf-token hf_xxx -r 100 -u 10 -v
+```
+
+#### 7. Test de robustesse avec drift
+Tester la robustesse du modèle face au data drift en production :
+```bash
+make simulate-gradio-drift-hf
+# ou
+python -m src.simulator --use-gradio \
+    --gradio-url https://francoisformation-oc-project8.hf.space \
+    --hf-token hf_xxx -r 200 -u 10 --enable-age-drift --age-drift-target 75 -v
+```
+
+#### 8. Validation de déploiement
+Valider qu'un nouveau déploiement fonctionne correctement :
+```bash
+# Test rapide (50 requêtes)
+make simulate-gradio-hf
+
+# Test approfondi avec drift progressif (300 requêtes)
+make simulate-gradio-drift-progressive-hf
+```
+
+#### 9. Comparaison local vs production
+Comparer les performances entre local et production :
+```bash
+# Local
+python -m src.simulator -r 100 -u 10 -e /predict_proba
+
+# Production (HF Spaces)
+python -m src.simulator --use-gradio \
+    --gradio-url https://francoisformation-oc-project8.hf.space \
+    --hf-token hf_xxx -r 100 -u 10 -e /predict_proba
 ```
 
 ## 🧪 Tests avec l'API locale
