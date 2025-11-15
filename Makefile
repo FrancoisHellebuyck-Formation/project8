@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive drift-analyze
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf drift-analyze
 
 # Variables
 PYTHON := python
@@ -65,6 +65,8 @@ help:
 	@echo "  make simulate-load    - Test de charge (500 requêtes, 50 users)"
 	@echo "  make simulate-drift   - Simule avec data drift immédiat (75 ans)"
 	@echo "  make simulate-drift-progressive - Drift progressif (50%-100%)"
+	@echo "  make simulate-gradio-local - Simule via Gradio API (local)"
+	@echo "  make simulate-gradio-hf - Simule via Gradio API (HF Spaces)"
 	@echo "  make drift-analyze    - Analyse le data drift"
 	@echo ""
 
@@ -310,6 +312,23 @@ simulate-drift-progressive:
 drift-analyze:
 	@echo "$(BLUE)Analyse du data drift...$(NC)"
 	@$(UV) run python -m src.simulator.drift_analyzer
+
+## simulate-gradio-local: Simule des requêtes via Gradio API local
+simulate-gradio-local:
+	@echo "$(BLUE)Simulation via Gradio API (local)...$(NC)"
+	@$(UV) run python -m src.simulator --use-gradio --gradio-url $(GRADIO_LOCAL_URL) -r 50 -u 5 -v
+
+## simulate-gradio-hf: Simule des requêtes via HuggingFace Spaces
+simulate-gradio-hf:
+	@echo "$(BLUE)Simulation via Gradio API (HuggingFace Spaces)...$(NC)"
+	@if [ -f .env ]; then \
+		echo "$(YELLOW)Chargement de HF_TOKEN depuis .env...$(NC)"; \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		$(UV) run python -m src.simulator --use-gradio --gradio-url $(GRADIO_HF_URL) --hf-token $$HF_TOKEN -r 50 -u 5 -v; \
+	else \
+		echo "$(YELLOW)⚠️  Fichier .env non trouvé, test sans token$(NC)"; \
+		$(UV) run python -m src.simulator --use-gradio --gradio-url $(GRADIO_HF_URL) -r 50 -u 5 -v; \
+	fi
 
 ## setup: Configuration initiale du projet
 setup: install-dev

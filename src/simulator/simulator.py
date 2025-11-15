@@ -3,16 +3,28 @@ Simulateur d'utilisateurs pour l'API de prédiction.
 
 Ce module permet de simuler des charges de travail sur l'API
 en envoyant des requêtes concurrentes avec des données aléatoires.
+
+Supporte deux modes:
+- HTTP: Requêtes directes via httpx (par défaut)
+- Gradio: Requêtes via l'API Gradio (compatible HF Spaces)
 """
 
 import asyncio
+import os
 import random
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import httpx
 from pydantic import BaseModel
+
+try:
+    from gradio_client import Client as GradioClient
+    GRADIO_AVAILABLE = True
+except ImportError:
+    GRADIO_AVAILABLE = False
 
 
 class SimulationConfig(BaseModel):
@@ -25,6 +37,10 @@ class SimulationConfig(BaseModel):
     timeout: float = 30.0
     endpoint: str = "/predict"
     verbose: bool = False
+    # Mode de simulation
+    use_gradio: bool = False  # Si True, utilise l'API Gradio
+    gradio_url: Optional[str] = None  # URL Gradio (ex: http://localhost:7860)
+    hf_token: Optional[str] = None  # Token HuggingFace pour Spaces privés
     # Data drift sur l'âge
     enable_age_drift: bool = False
     age_drift_target_mean: float = 70.0
@@ -116,6 +132,18 @@ class UserSimulator:
         self.successful = 0
         self.failed = 0
         self.request_count = 0
+        self.gradio_client = None
+
+        # Initialiser le client Gradio si nécessaire
+        if self.config.use_gradio:
+            if not GRADIO_AVAILABLE:
+                raise ImportError(
+                    "gradio_client n'est pas installé. "
+                    "Installez-le avec: pip install gradio-client"
+                )
+            gradio_url = self.config.gradio_url or "http://localhost:7860"
+            hf_token = self.config.hf_token or os.environ.get("HF_TOKEN")
+            self.gradio_client = GradioClient(gradio_url, hf_token=hf_token)
 
     def _calculate_age_with_drift(self) -> int:
         """
@@ -189,6 +217,63 @@ class UserSimulator:
             "CHEST PAIN": random.randint(0, 1),
             "CHRONIC DISEASE": random.randint(0, 1),
         }
+
+    def send_request_gradio(self, request_id: int) -> Dict:
+        """
+        Envoie une requête via l'API Gradio (mode synchrone).
+
+        Args:
+            request_id: Identifiant de la requête.
+
+        Returns:
+            Dictionnaire avec les résultats de la requête.
+        """
+        patient_data = self.generate_patient_data()
+
+        start_time = time.time()
+        result = {
+            "request_id": request_id,
+            "success": False,
+            "response_time": 0.0,
+            "status_code": 0,
+            "error": None,
+        }
+
+        try:
+            # Déterminer l'endpoint Gradio en fonction de l'endpoint FastAPI
+            if "predict_proba" in self.config.endpoint:
+                api_name = "/predict_proba_api"
+            else:
+                api_name = "/predict_api"
+
+            # Envoyer la requête (résultat non utilisé, on mesure juste le temps)
+            self.gradio_client.predict(
+                patient_data,
+                api_name=api_name
+            )
+            response_time = (time.time() - start_time) * 1000  # en ms
+
+            result["success"] = True
+            result["response_time"] = response_time
+            result["status_code"] = 200
+
+            if self.config.verbose:
+                print(
+                    f"Request {request_id}: "
+                    f"200 - "
+                    f"{response_time:.2f}ms"
+                )
+
+        except Exception as e:
+            result["error"] = f"Erreur Gradio: {str(e)}"
+            if self.config.verbose:
+                print(f"Request {request_id}: Error - {str(e)}")
+
+        finally:
+            response_time = (time.time() - start_time) * 1000
+            result["response_time"] = response_time
+
+        return result
 
     async def send_request(
         self, client: httpx.AsyncClient, request_id: int
@@ -279,6 +364,126 @@ class UserSimulator:
 
         results = await asyncio.gather(*tasks)
         return results
+
+    def run_batch_gradio(
+        self, start_id: int, batch_size: int
+    ) -> List[Dict]:
+        """
+        Execute un lot de requêtes via Gradio (synchrone).
+
+        Args:
+            start_id: ID de départ pour les requêtes.
+            batch_size: Nombre de requêtes dans le lot.
+
+        Returns:
+            Liste des résultats.
+        """
+        results = []
+        with ThreadPoolExecutor(
+            max_workers=self.config.concurrent_users
+        ) as executor:
+            futures = []
+            for i in range(batch_size):
+                request_id = start_id + i
+                future = executor.submit(self.send_request_gradio, request_id)
+                futures.append(future)
+
+                # Délai entre les requêtes si configuré
+                if self.config.delay_between_requests > 0:
+                    time.sleep(self.config.delay_between_requests)
+
+            # Récupérer tous les résultats
+            for future in futures:
+                results.append(future.result())
+
+        return results
+
+    def run_simulation_gradio(self) -> SimulationResult:
+        """
+        Execute la simulation complète en mode Gradio (synchrone).
+
+        Returns:
+            SimulationResult avec les résultats de la simulation.
+        """
+        print("\n🚀 Démarrage de la simulation (mode Gradio)...")
+        gradio_url = self.config.gradio_url or "http://localhost:7860"
+        print(f"   Gradio: {gradio_url}")
+        print(f"   Endpoint: {self.config.endpoint}")
+        print(f"   Requêtes: {self.config.num_requests}")
+        print(f"   Utilisateurs concurrents: {self.config.concurrent_users}")
+        print()
+
+        start_time = time.time()
+
+        # Diviser les requêtes en lots selon le nombre d'utilisateurs
+        batch_size = self.config.concurrent_users
+        num_batches = (
+            self.config.num_requests + batch_size - 1
+        ) // batch_size
+
+        all_results = []
+        for batch_num in range(num_batches):
+            start_id = batch_num * batch_size
+            remaining = self.config.num_requests - start_id
+            current_batch_size = min(batch_size, remaining)
+
+            if self.config.verbose:
+                print(
+                    f"\n📦 Lot {batch_num + 1}/{num_batches} "
+                    f"({current_batch_size} requêtes)"
+                )
+
+            batch_results = self.run_batch_gradio(
+                start_id, current_batch_size
+            )
+            all_results.extend(batch_results)
+
+            # Afficher progression
+            progress = len(all_results) / self.config.num_requests * 100
+            print(f"   Progression: {progress:.1f}% ", end="\r")
+
+        total_duration = time.time() - start_time
+
+        # Analyser les résultats
+        for result in all_results:
+            self.response_times.append(result["response_time"])
+
+            if result["success"]:
+                self.successful += 1
+            else:
+                self.failed += 1
+                if result["error"]:
+                    self.errors.append(result["error"])
+
+            status_code = result["status_code"]
+            if status_code > 0:
+                self.status_codes[status_code] = (
+                    self.status_codes.get(status_code, 0) + 1
+                )
+
+        # Calculer les statistiques
+        avg_response_time = (
+            sum(self.response_times) / len(self.response_times)
+            if self.response_times
+            else 0
+        )
+        min_response_time = min(self.response_times) if self.response_times else 0  # noqa: E501
+        max_response_time = max(self.response_times) if self.response_times else 0  # noqa: E501
+        rps = self.config.num_requests / total_duration if total_duration > 0 else 0  # noqa: E501
+
+        return SimulationResult(
+            total_requests=self.config.num_requests,
+            successful_requests=self.successful,
+            failed_requests=self.failed,
+            total_duration=total_duration,
+            avg_response_time=avg_response_time,
+            min_response_time=min_response_time,
+            max_response_time=max_response_time,
+            requests_per_second=rps,
+            response_times=self.response_times,
+            errors=self.errors,
+            status_codes=self.status_codes,
+        )
 
     async def run_simulation(self) -> SimulationResult:
         """
@@ -373,4 +578,7 @@ class UserSimulator:
         Returns:
             SimulationResult avec les résultats.
         """
-        return asyncio.run(self.run_simulation())
+        if self.config.use_gradio:
+            return self.run_simulation_gradio()
+        else:
+            return asyncio.run(self.run_simulation())

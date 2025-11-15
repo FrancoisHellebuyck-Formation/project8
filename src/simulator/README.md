@@ -1,6 +1,6 @@
 # Simulateur d'Utilisateurs - API de Prédiction ML
 
-Outil de simulation de charge pour tester les performances et la robustesse de l'API FastAPI.
+Outil de simulation de charge pour tester les performances et la robustesse de l'API FastAPI et Gradio.
 
 ## 🎯 Fonctionnalités
 
@@ -11,10 +11,15 @@ Outil de simulation de charge pour tester les performances et la robustesse de l
 - **Configuration flexible** : Paramètres personnalisables via CLI
 - **Rapports visuels** : Affichage formaté des résultats
 - **🆕 Simulation de data drift** : Génère un drift progressif sur l'âge des patients pour tester la robustesse du modèle
+- **🔌 Mode Gradio** : Supporte les API Gradio (local et HuggingFace Spaces)
 
 ## 📋 Prérequis
 
-Le simulateur utilise `httpx` pour les requêtes asynchrones. Cette dépendance est déjà incluse dans le projet.
+Le simulateur utilise :
+- `httpx` pour les requêtes HTTP asynchrones (mode FastAPI)
+- `gradio_client` pour les requêtes Gradio (mode Gradio)
+
+Ces dépendances sont déjà incluses dans le projet.
 
 ## ⚙️ Configuration
 
@@ -43,7 +48,7 @@ SIMULATOR_AGE_DRIFT_END=100.0                 # Fin du drift (%)
 
 ## 🚀 Usage
 
-### Usage basique
+### Mode FastAPI (par défaut)
 
 ```bash
 # Simulation avec la configuration du .env
@@ -57,11 +62,7 @@ python -m src.simulator --requests 200 --users 20
 
 # Version courte
 python -m src.simulator -r 500 -u 50
-```
 
-### Usage avancé
-
-```bash
 # API distante
 python -m src.simulator --url http://api.example.com:8000 -r 100 -u 10
 
@@ -77,6 +78,41 @@ python -m src.simulator -r 50 -u 5 -v
 # Test de charge intensif
 python -m src.simulator -r 1000 -u 100 --timeout 60
 ```
+
+### 🔌 Mode Gradio
+
+Le simulateur peut cibler l'API Gradio au lieu de l'API FastAPI directe. Ce mode est compatible avec HuggingFace Spaces.
+
+```bash
+# Simulation via Gradio en local
+python -m src.simulator --use-gradio --gradio-url http://localhost:7860 -r 50 -u 5
+
+# Ou utiliser le Makefile
+make simulate-gradio-local
+
+# Simulation via HuggingFace Spaces (Space public)
+python -m src.simulator --use-gradio \
+    --gradio-url https://francoisformation-oc-project8.hf.space \
+    -r 50 -u 5
+
+# Simulation via HuggingFace Spaces (Space privé avec token)
+python -m src.simulator --use-gradio \
+    --gradio-url https://francoisformation-oc-project8.hf.space \
+    --hf-token hf_xxxxxxxxxxxxxxxxxxxxx \
+    -r 50 -u 5
+
+# Ou utiliser le Makefile (charge automatiquement HF_TOKEN depuis .env)
+make simulate-gradio-hf
+
+# Mode verbose pour voir chaque requête Gradio
+python -m src.simulator --use-gradio --gradio-url http://localhost:7860 -r 20 -u 3 -v
+```
+
+**Notes sur le mode Gradio :**
+- Le mode Gradio utilise `gradio_client` pour communiquer avec l'API Gradio
+- Compatible avec HuggingFace Spaces (public et privé avec token)
+- Les endpoints sont mappés automatiquement : `/predict` → `/predict_api`, `/predict_proba` → `/predict_proba_api`
+- Les requêtes sont exécutées de manière concurrente via `ThreadPoolExecutor`
 
 ### 🔄 Simulation de Data Drift
 
@@ -114,13 +150,19 @@ Cet outil affiche des statistiques par fenêtre pour visualiser l'évolution de 
 
 | Option | Court | Description | Défaut |
 |--------|-------|-------------|--------|
-| `--url` | - | URL de base de l'API | `http://localhost:8000` |
+| **Mode de simulation** | | | |
+| `--use-gradio` | - | Utilise l'API Gradio au lieu de FastAPI | `False` |
+| `--gradio-url` | - | URL Gradio (local ou HF Spaces) | `http://localhost:7860` |
+| `--hf-token` | - | Token HuggingFace pour Spaces privés | `None` |
+| **Configuration générale** | | | |
+| `--url` | - | URL de base de l'API FastAPI | `http://localhost:8000` |
 | `--requests` | `-r` | Nombre total de requêtes | `100` |
 | `--users` | `-u` | Utilisateurs concurrents | `10` |
 | `--delay` | `-d` | Délai entre requêtes (s) | `0.0` |
 | `--timeout` | `-t` | Timeout par requête (s) | `30.0` |
 | `--endpoint` | `-e` | Endpoint à tester | `/predict` |
 | `--verbose` | `-v` | Mode verbeux | `False` |
+| **Data Drift** | | | |
 | `--enable-age-drift` | - | Active le data drift sur l'âge | `False` |
 | `--age-drift-target` | - | Âge moyen cible du drift | `70.0` |
 | `--age-drift-start` | - | Début du drift (%) | `0.0` |
@@ -161,7 +203,9 @@ Erreurs: 0
 
 ## 🔧 Usage programmatique
 
-Vous pouvez également utiliser le simulateur dans votre code Python :
+### Mode FastAPI
+
+Vous pouvez utiliser le simulateur dans votre code Python :
 
 ```python
 from src.simulator import UserSimulator, SimulationConfig
@@ -185,7 +229,38 @@ print(f"Temps moyen: {result.avg_response_time:.2f}ms")
 print(f"RPS: {result.requests_per_second:.2f}")
 ```
 
-### Utilisation asynchrone
+### Mode Gradio
+
+```python
+from src.simulator import UserSimulator, SimulationConfig
+
+# Configuration pour Gradio local
+config = SimulationConfig(
+    use_gradio=True,
+    gradio_url="http://localhost:7860",
+    num_requests=50,
+    concurrent_users=5,
+    endpoint="/predict",
+    verbose=True
+)
+
+# Configuration pour HuggingFace Spaces (privé)
+config_hf = SimulationConfig(
+    use_gradio=True,
+    gradio_url="https://francoisformation-oc-project8.hf.space",
+    hf_token="hf_xxxxxxxxxxxxxxxxxxxxx",
+    num_requests=50,
+    concurrent_users=5,
+    endpoint="/predict_proba"
+)
+
+# Lancer la simulation
+simulator = UserSimulator(config)
+result = simulator.run()
+print(result)
+```
+
+### Utilisation asynchrone (FastAPI uniquement)
 
 ```python
 import asyncio
@@ -199,6 +274,8 @@ async def main():
 
 asyncio.run(main())
 ```
+
+**Note :** Le mode Gradio utilise `run_simulation_gradio()` qui est synchrone. Pour le mode Gradio, utilisez directement `simulator.run()`.
 
 ## 📈 Cas d'usage
 
