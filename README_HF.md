@@ -116,13 +116,39 @@ Un script de test complet est fourni pour valider tous les endpoints :
 # Test en local (nécessite API + Gradio lancés)
 make test-gradio-api-local
 
-# Test sur HuggingFace Spaces
+# Test sur HuggingFace Spaces (Space PUBLIC uniquement)
 make test-gradio-api-hf
 
 # Ou directement avec Python
 python test_gradio_api.py  # Local par défaut
 GRADIO_URL=https://francoisformation-oc-project8.hf.space python test_gradio_api.py
 ```
+
+**⚠️ Important : Spaces privés vs publics**
+
+Les endpoints Gradio API sont accessibles **uniquement si le Space HuggingFace est PUBLIC**.
+
+- **Space PUBLIC** : Accessible sans authentification via `gradio_client`
+- **Space PRIVÉ** : Nécessite un token HuggingFace
+
+**Configuration du token pour Space privé :**
+
+1. Créer un token sur https://huggingface.co/settings/tokens
+2. Ajouter le token dans votre fichier `.env` :
+   ```bash
+   HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxx
+   ```
+3. Lancer les tests (le Makefile charge automatiquement le token depuis .env) :
+   ```bash
+   make test-gradio-api-hf
+   ```
+
+**Ou manuellement avec variable d'environnement :**
+```bash
+HF_TOKEN=your_hf_token GRADIO_URL=https://francoisformation-oc-project8.hf.space python test_gradio_api.py
+```
+
+**Pour rendre votre Space public :** Settings → Visibility → Public
 
 ## 📋 Features du modèle
 

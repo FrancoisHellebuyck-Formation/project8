@@ -152,8 +152,16 @@ test-gradio-api-local:
 test-gradio-api-hf:
 	@echo "$(BLUE)Test de l'API Gradio (HuggingFace Spaces)...$(NC)"
 	@echo "$(YELLOW)URL: $(GRADIO_HF_URL)$(NC)"
-	@GRADIO_URL=$(GRADIO_HF_URL) $(PYTHON) test_gradio_api.py || \
-		(echo "$(RED)✗ Tests Gradio API échoués$(NC)" && exit 1)
+	@if [ -f .env ]; then \
+		echo "$(YELLOW)Chargement de HF_TOKEN depuis .env...$(NC)"; \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		GRADIO_URL=$(GRADIO_HF_URL) $(PYTHON) test_gradio_api.py || \
+		(echo "$(RED)✗ Tests Gradio API échoués$(NC)" && exit 1); \
+	else \
+		echo "$(YELLOW)⚠️  Fichier .env non trouvé, test sans token$(NC)"; \
+		GRADIO_URL=$(GRADIO_HF_URL) $(PYTHON) test_gradio_api.py || \
+		(echo "$(RED)✗ Tests Gradio API échoués$(NC)" && exit 1); \
+	fi
 	@echo "$(GREEN)✓ Tests Gradio API passent$(NC)"
 
 ## run-api: Lance l'API FastAPI
