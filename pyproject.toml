@@ -73,6 +73,7 @@ omit = [
     "src/main.py",
     "src/*/__init__.py",
     "src/simulator/*",
+    "src/logs_pipeline/*",
 ]
 
 [tool.coverage.report]
