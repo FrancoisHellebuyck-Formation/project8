@@ -121,14 +121,19 @@ class TestGetRedisLogs:
         # Avec decode_responses=True, Redis retourne des strings
         mock_logs = ["log1", "log2", "log3"]
         mock_redis_instance.lrange.return_value = mock_logs
+        mock_redis_instance.llen.return_value = 3
         mock_redis_instance.ping.return_value = True
         mock_redis.return_value = mock_redis_instance
 
         result = get_redis_logs(limit=10)
 
-        assert len(result) == 3
-        assert result[0] == "log1"
-        assert result[1] == "log2"
+        assert isinstance(result, dict)
+        assert len(result['logs']) == 3
+        assert result['logs'][0] == "log1"
+        assert result['logs'][1] == "log2"
+        assert result['total'] == 3
+        assert result['offset'] == 0
+        assert result['limit'] == 10
         mock_redis_instance.lrange.assert_called_once()
 
     @patch('src.config.settings')
@@ -145,12 +150,15 @@ class TestGetRedisLogs:
         mock_redis_instance = MagicMock()
         mock_logs = ["log1", "log2"]
         mock_redis_instance.lrange.return_value = mock_logs
+        mock_redis_instance.llen.return_value = 2
         mock_redis_instance.ping.return_value = True
         mock_redis.return_value = mock_redis_instance
 
         result = get_redis_logs(limit=2)
 
-        assert len(result) == 2
+        assert isinstance(result, dict)
+        assert len(result['logs']) == 2
+        assert result['limit'] == 2
 
     @patch('src.config.settings')
     @patch('src.api.logging_config.redis.Redis')
@@ -168,7 +176,7 @@ class TestGetRedisLogs:
 
         result = get_redis_logs(limit=10)
 
-        assert result == []
+        assert result == {"logs": [], "total": 0, "offset": 0, "limit": 10}
 
 
 class TestClearRedisLogs:
@@ -229,11 +237,12 @@ class TestEdgeCases:
 
         mock_redis_instance = MagicMock()
         mock_redis_instance.lrange.return_value = []
+        mock_redis_instance.llen.return_value = 0
         mock_redis.return_value = mock_redis_instance
 
         result = get_redis_logs(limit=0)
 
-        assert result == []
+        assert result == {"logs": [], "total": 0, "offset": 0, "limit": 0}
 
     @patch('src.config.settings')
     @patch('src.api.logging_config.redis.Redis')
@@ -250,10 +259,12 @@ class TestEdgeCases:
         # decode_responses=True décode automatiquement
         mock_logs = ["log with é accents"]
         mock_redis_instance.lrange.return_value = mock_logs
+        mock_redis_instance.llen.return_value = 1
         mock_redis_instance.ping.return_value = True
         mock_redis.return_value = mock_redis_instance
 
         result = get_redis_logs(limit=10)
 
-        assert len(result) == 1
-        assert isinstance(result[0], str)
+        assert isinstance(result, dict)
+        assert len(result['logs']) == 1
+        assert isinstance(result['logs'][0], str)
