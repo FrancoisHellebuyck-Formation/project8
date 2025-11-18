@@ -339,19 +339,23 @@ async def predict_proba(patient: PatientData):
 
 @app.get("/logs", response_model=LogsResponse, tags=["Logs"])
 async def get_logs(
-    limit: int = Query(100, ge=1, le=1000, description="Nombre de logs")
+    limit: int = Query(100, ge=1, le=1000, description="Nombre de logs"),
+    offset: int = Query(0, ge=0, description="Offset pour la pagination")
 ):
     """
-    Récupère les logs de l'API depuis Redis.
+    Récupère les logs de l'API depuis Redis avec pagination.
 
     Args:
         limit: Nombre maximum de logs à récupérer.
+        offset: Nombre de logs à sauter (pour la pagination).
 
     Returns:
-        LogsResponse: Liste des logs.
+        LogsResponse: Liste des logs avec métadonnées de pagination.
     """
     try:
-        logs = get_redis_logs(limit=limit)
+        result = get_redis_logs(limit=limit, offset=offset)
+        logs = result["logs"]
+        total = result["total"]
 
         # Parser les logs pour extraire les informations
         log_entries = []
@@ -367,7 +371,7 @@ async def get_logs(
                 })
 
         return LogsResponse(
-            total=len(log_entries),
+            total=total,
             logs=log_entries
         )
 

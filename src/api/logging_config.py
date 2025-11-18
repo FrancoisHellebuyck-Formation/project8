@@ -156,17 +156,19 @@ def get_logger() -> logging.Logger:
 
 def get_redis_logs(
     limit: int = 100,
+    offset: int = 0,
     redis_client: Optional[redis.Redis] = None
-) -> list:
+) -> dict:
     """
-    Récupère les logs depuis Redis.
+    Récupère les logs depuis Redis avec pagination.
 
     Args:
         limit: Nombre maximum de logs à récupérer.
+        offset: Nombre de logs à sauter (pour la pagination).
         redis_client: Client Redis. Si None, en crée un nouveau.
 
     Returns:
-        list: Liste des logs au format string.
+        dict: Dictionnaire avec 'logs', 'total', 'offset', 'limit'.
     """
     if redis_client is None:
         try:
@@ -178,17 +180,27 @@ def get_redis_logs(
             )
             redis_client.ping()
         except redis.ConnectionError:
-            return []
+            return {"logs": [], "total": 0, "offset": offset, "limit": limit}
 
     try:
+        # Obtenir le nombre total de logs
+        total = redis_client.llen(settings.REDIS_LOGS_KEY)
+
+        # Récupérer les logs avec offset
         logs = redis_client.lrange(
             settings.REDIS_LOGS_KEY,
-            0,
-            limit - 1
+            offset,
+            offset + limit - 1
         )
-        return logs
+
+        return {
+            "logs": logs,
+            "total": total,
+            "offset": offset,
+            "limit": limit
+        }
     except Exception:
-        return []
+        return {"logs": [], "total": 0, "offset": offset, "limit": limit}
 
 
 def clear_redis_logs(
