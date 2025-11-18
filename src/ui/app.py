@@ -245,11 +245,12 @@ def api_predict_proba_proxy(payload: dict):
         return {"error": str(e)}, 503
 
 
-def api_logs_proxy(limit: int = 100):
-    """Proxy vers l'endpoint /logs de FastAPI."""
+def api_logs_proxy(limit: int = 100, offset: int = 0):
+    """Proxy vers l'endpoint /logs de FastAPI avec pagination."""
     try:
         response = requests.get(
-            f"{settings.API_URL}/logs?limit={limit}", timeout=10
+            f"{settings.API_URL}/logs?limit={limit}&offset={offset}",
+            timeout=10
         )
         return response.json(), response.status_code
     except Exception as e:
@@ -544,18 +545,25 @@ def create_interface() -> gr.Blocks:
                         step=1,
                         label="Nombre de logs à récupérer"
                     )
+                    logs_offset_input = gr.Number(
+                        value=0,
+                        minimum=0,
+                        step=1,
+                        label="Offset (pagination)",
+                        precision=0
+                    )
                     logs_btn = gr.Button("📋 Récupérer les logs", variant="secondary")
                 with gr.Column(scale=2):
                     logs_output = gr.JSON(label="Logs")
 
-            def logs_api_wrapper(limit):
+            def logs_api_wrapper(limit, offset):
                 """Wrapper pour l'API des logs."""
-                result, _ = api_logs_proxy(int(limit))
+                result, _ = api_logs_proxy(int(limit), int(offset))
                 return result
 
             logs_btn.click(
                 fn=logs_api_wrapper,
-                inputs=logs_limit_input,
+                inputs=[logs_limit_input, logs_offset_input],
                 outputs=logs_output,
                 api_name="logs_api"
             )

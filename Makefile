@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs health predict-test simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs logs-gradio-local logs-gradio-hf health predict-test pipeline-check pipeline-once pipeline-continuous pipeline-elasticsearch-up pipeline-elasticsearch-down simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze
 
 # Variables
 PYTHON := python
@@ -56,8 +56,17 @@ help:
 	@echo ""
 	@echo "$(GREEN)Utilitaires:$(NC)"
 	@echo "  make logs             - Affiche les logs de l'API via endpoint"
+	@echo "  make logs-gradio-local - Affiche les logs via Gradio local"
+	@echo "  make logs-gradio-hf   - Affiche les logs via Gradio HF Spaces"
 	@echo "  make health           - Vérifie la santé de l'API"
 	@echo "  make predict-test     - Test une prédiction"
+	@echo ""
+	@echo "$(GREEN)Pipeline Elasticsearch:$(NC)"
+	@echo "  make pipeline-elasticsearch-up - Lance Elasticsearch et Kibana"
+	@echo "  make pipeline-elasticsearch-down - Arrête Elasticsearch et Kibana"
+	@echo "  make pipeline-check   - Vérifie les pré-requis du pipeline"
+	@echo "  make pipeline-once    - Exécute le pipeline une fois"
+	@echo "  make pipeline-continuous - Exécute le pipeline en continu"
 	@echo ""
 	@echo "$(GREEN)Simulation FastAPI:$(NC)"
 	@echo "  make simulate         - Simule des requêtes (config depuis .env)"
@@ -256,6 +265,30 @@ logs:
 		$(PYTHON) -m json.tool || \
 		echo "$(RED)✗ Impossible de récupérer les logs$(NC)"
 
+## logs-gradio-local: Affiche les logs via Gradio local
+logs-gradio-local:
+	@echo "$(BLUE)Récupération des logs via Gradio local...$(NC)"
+	@$(UV) run python scripts/get_logs_gradio.py \
+		--gradio-url $(GRADIO_LOCAL_URL) \
+		--limit 50
+
+## logs-gradio-hf: Affiche les logs via Gradio HF Spaces
+logs-gradio-hf:
+	@echo "$(BLUE)Récupération des logs via Gradio HF Spaces...$(NC)"
+	@if [ -f .env ]; then \
+		echo "$(YELLOW)Chargement de HF_TOKEN depuis .env...$(NC)"; \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		$(UV) run python scripts/get_logs_gradio.py \
+			--gradio-url $(GRADIO_HF_URL) \
+			--hf-token $$HF_TOKEN \
+			--limit 50; \
+	else \
+		echo "$(YELLOW)⚠️  Fichier .env non trouvé, test sans token$(NC)"; \
+		$(UV) run python scripts/get_logs_gradio.py \
+			--gradio-url $(GRADIO_HF_URL) \
+			--limit 50; \
+	fi
+
 ## health: Vérifie la santé de l'API
 health:
 	@echo "$(BLUE)Vérification de la santé de l'API...$(NC)"
@@ -374,6 +407,50 @@ simulate-gradio-hf:
 	else \
 		echo "$(YELLOW)⚠️  Fichier .env non trouvé, test sans token$(NC)"; \
 		$(UV) run python -m src.simulator --use-gradio --gradio-url $(GRADIO_HF_URL) -r 50 -u 5 -v; \
+	fi
+
+## pipeline-elasticsearch-up: Lance Elasticsearch et Kibana
+pipeline-elasticsearch-up:
+	@echo "$(BLUE)Démarrage d'Elasticsearch et Kibana...$(NC)"
+	@cd elasticsearch && docker-compose up -d
+	@echo "$(GREEN)✓ Elasticsearch et Kibana démarrés$(NC)"
+	@echo "$(YELLOW)Elasticsearch: http://localhost:9200$(NC)"
+	@echo "$(YELLOW)Kibana: http://localhost:5601$(NC)"
+
+## pipeline-elasticsearch-down: Arrête Elasticsearch et Kibana
+pipeline-elasticsearch-down:
+	@echo "$(BLUE)Arrêt d'Elasticsearch et Kibana...$(NC)"
+	@cd elasticsearch && docker-compose down
+	@echo "$(GREEN)✓ Elasticsearch et Kibana arrêtés$(NC)"
+
+## pipeline-check: Vérifie les pré-requis du pipeline
+pipeline-check:
+	@if [ -f .env ]; then \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		$(UV) run python scripts/check_pipeline_prerequisites.py; \
+	else \
+		$(UV) run python scripts/check_pipeline_prerequisites.py; \
+	fi
+
+## pipeline-once: Exécute le pipeline une fois
+pipeline-once:
+	@echo "$(BLUE)Exécution du pipeline (une fois)...$(NC)"
+	@if [ -f .env ]; then \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		$(UV) run python -m src.logs_pipeline --once; \
+	else \
+		$(UV) run python -m src.logs_pipeline --once; \
+	fi
+
+## pipeline-continuous: Exécute le pipeline en continu
+pipeline-continuous:
+	@echo "$(BLUE)Exécution du pipeline en continu...$(NC)"
+	@echo "$(YELLOW)Appuyez sur Ctrl+C pour arrêter$(NC)"
+	@if [ -f .env ]; then \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		$(UV) run python -m src.logs_pipeline --continuous --interval 10; \
+	else \
+		$(UV) run python -m src.logs_pipeline --continuous --interval 10; \
 	fi
 
 ## setup: Configuration initiale du projet
