@@ -432,6 +432,21 @@ pipeline-check:
 		$(UV) run python scripts/check_pipeline_prerequisites.py; \
 	fi
 
+## pipeline-test-indexes: Teste la création des index Elasticsearch
+pipeline-test-indexes:
+	@echo "$(BLUE)Test de création des index Elasticsearch...$(NC)"
+	@$(UV) run python scripts/test_elasticsearch_indexes.py
+
+## pipeline-test-parsing: Teste le parsing des logs
+pipeline-test-parsing:
+	@echo "$(BLUE)Test du parsing des logs...$(NC)"
+	@$(UV) run python scripts/test_log_parsing.py
+
+## pipeline-clear-indexes: Vide les index Elasticsearch
+pipeline-clear-indexes:
+	@echo "$(BLUE)Suppression des index Elasticsearch...$(NC)"
+	@$(UV) run python scripts/clear_elasticsearch_indexes.py
+
 ## pipeline-once: Exécute le pipeline une fois
 pipeline-once:
 	@echo "$(BLUE)Exécution du pipeline (une fois)...$(NC)"

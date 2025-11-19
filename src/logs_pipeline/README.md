@@ -25,8 +25,10 @@ Filtre les logs selon un pattern défini :
 - Vérifie le message, le path HTTP et la méthode
 
 ### 4. `indexer.py` - Indexeur Elasticsearch
-Indexe les logs dans Elasticsearch :
-- Création automatique de l'index avec mapping
+Indexe les logs dans Elasticsearch avec une double indexation :
+- **Index `ml-api-logs`** : Logs bruts complets avec tous les champs
+- **Index `ml-api-message`** : Messages parsés avec uniquement les données structurées (input_data, result)
+- Création automatique des index avec mapping adapté
 - Indexation en masse (bulk insert)
 - Gestion de la connexion
 
@@ -156,25 +158,76 @@ else:
 pipeline.run_continuous(limit=100, poll_interval=10)
 ```
 
-## Visualisation avec Kibana
+## Structure des index Elasticsearch
 
-1. Ouvrir Kibana : http://localhost:5601
-2. Aller dans "Stack Management" > "Index Patterns"
-3. Créer un index pattern `ml-api-logs*`
-4. Aller dans "Discover" pour visualiser les logs
+Le pipeline crée automatiquement deux index distincts :
 
-### Champs disponibles
+### 1. Index `ml-api-logs` - Logs bruts complets
 
-- `@timestamp` : Date/heure du log
+Contient tous les logs avec l'ensemble des champs :
+- `@timestamp` : Date/heure du log (format ISO 8601)
 - `level` : Niveau de log (INFO, ERROR, etc.)
-- `message` : Message du log
-- `transaction_id` : ID unique de la transaction
+- `logger` : Nom du logger
+- `message` : Message complet du log
+- `raw_log` : Log brut tel qu'envoyé par l'API
+- `transaction_id` : ID unique de la transaction (UUID)
 - `http_method` : Méthode HTTP (POST)
 - `http_path` : Path HTTP (/predict)
 - `status_code` : Code HTTP de réponse
 - `execution_time_ms` : Temps d'exécution en ms
-- `input_data` : Données d'entrée de la prédiction
-- `result` : Résultat de la prédiction
+- `input_data` : Données d'entrée de la prédiction (objet JSON)
+- `result` : Résultat de la prédiction (objet JSON)
+
+### 2. Index `ml-api-message` - Messages parsés uniquement
+
+Contient uniquement les logs qui ont été parsés avec succès (avec input_data et result) :
+- `@timestamp` : Date/heure du log
+- `transaction_id` : ID unique de la transaction
+- `http_method` : Méthode HTTP
+- `http_path` : Path HTTP
+- `status_code` : Code HTTP de réponse
+- `execution_time_ms` : Temps d'exécution
+- `input_data` : Données d'entrée structurées avec tous les champs patients :
+  - AGE, GENDER, SMOKING, YELLOW_FINGERS, ANXIETY, PEER_PRESSURE,
+  - CHRONIC_DISEASE, FATIGUE, ALLERGY, WHEEZING, ALCOHOL, COUGHING,
+  - SHORTNESS_OF_BREATH, SWALLOWING_DIFFICULTY, CHEST_PAIN
+- `result` : Résultat structuré avec :
+  - prediction (YES/NO)
+  - probability (0.0 à 1.0)
+  - message (texte descriptif)
+
+**Avantages de la double indexation :**
+- `ml-api-logs` : Pour le débogage et l'audit complet
+- `ml-api-message` : Pour l'analyse des prédictions et du drift de données
+
+## Visualisation avec Kibana
+
+1. Ouvrir Kibana : http://localhost:5601
+2. Aller dans "Stack Management" > "Index Patterns"
+3. Créer deux index patterns :
+   - `ml-api-logs*` pour les logs complets
+   - `ml-api-message*` pour les messages parsés uniquement
+4. Aller dans "Discover" pour visualiser les logs
+
+### Tester la création des index
+
+```bash
+make pipeline-test-indexes
+```
+
+Cette commande vérifie que les deux index sont créés avec les bons mappings.
+
+### Vider les index Elasticsearch
+
+Pour supprimer tous les logs indexés et repartir de zéro :
+
+```bash
+make pipeline-clear-indexes
+```
+
+Cette commande supprime les index `ml-api-logs` et `ml-api-message`. Les index seront automatiquement recréés au prochain lancement du pipeline.
+
+⚠️ **Attention** : Cette action est irréversible. Tous les logs indexés seront définitivement supprimés.
 
 ## Arrêter le pipeline
 

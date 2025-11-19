@@ -35,7 +35,7 @@ class ElasticsearchIndexer:
         Args:
             host: Hôte Elasticsearch
             port: Port Elasticsearch
-            index: Nom de l'index
+            index: Nom de l'index pour les logs bruts
         """
         if not ELASTICSEARCH_AVAILABLE:
             raise ImportError(
@@ -46,6 +46,7 @@ class ElasticsearchIndexer:
         self.host = host or config.elasticsearch_host
         self.port = port or config.elasticsearch_port
         self.index = index or config.elasticsearch_index
+        self.message_index = "ml-api-message"  # Index pour messages parsés
         self.client: Optional[Elasticsearch] = None
 
     def connect(self) -> bool:
@@ -81,11 +82,11 @@ class ElasticsearchIndexer:
             return False
 
     def _create_index_if_not_exists(self) -> None:
-        """Crée l'index s'il n'existe pas."""
+        """Crée les index s'ils n'existent pas."""
         try:
+            # Index pour les logs bruts complets
             if not self.client.indices.exists(index=self.index):
-                # Définir le mapping
-                mapping = {
+                logs_mapping = {
                     "mappings": {
                         "properties": {
                             "@timestamp": {"type": "date"},
@@ -103,14 +104,98 @@ class ElasticsearchIndexer:
                         }
                     }
                 }
-                self.client.indices.create(index=self.index, body=mapping)
+                self.client.indices.create(
+                    index=self.index, body=logs_mapping
+                )
                 logger.info(f"Index '{self.index}' créé avec succès")
+
+            # Index pour les messages parsés uniquement
+            if not self.client.indices.exists(index=self.message_index):
+                message_mapping = {
+                    "mappings": {
+                        "properties": {
+                            "@timestamp": {"type": "date"},
+                            "transaction_id": {"type": "keyword"},
+                            "http_method": {"type": "keyword"},
+                            "http_path": {"type": "keyword"},
+                            "status_code": {"type": "integer"},
+                            "execution_time_ms": {"type": "float"},
+                            "input_data": {
+                                "type": "object",
+                                "properties": {
+                                    "AGE": {"type": "integer"},
+                                    "GENDER": {"type": "keyword"},
+                                    "SMOKING": {"type": "integer"},
+                                    "YELLOW_FINGERS": {"type": "integer"},
+                                    "ANXIETY": {"type": "integer"},
+                                    "PEER_PRESSURE": {"type": "integer"},
+                                    "CHRONIC_DISEASE": {"type": "integer"},
+                                    "FATIGUE": {"type": "integer"},
+                                    "ALLERGY": {"type": "integer"},
+                                    "WHEEZING": {"type": "integer"},
+                                    "ALCOHOL": {"type": "integer"},
+                                    "COUGHING": {"type": "integer"},
+                                    "SHORTNESS_OF_BREATH": {
+                                        "type": "integer"
+                                    },
+                                    "SWALLOWING_DIFFICULTY": {
+                                        "type": "integer"
+                                    },
+                                    "CHEST_PAIN": {"type": "integer"}
+                                }
+                            },
+                            "result": {
+                                "type": "object",
+                                "properties": {
+                                    "prediction": {"type": "keyword"},
+                                    "probability": {"type": "float"},
+                                    "message": {"type": "text"}
+                                }
+                            }
+                        }
+                    }
+                }
+                self.client.indices.create(
+                    index=self.message_index, body=message_mapping
+                )
+                logger.info(
+                    f"Index '{self.message_index}' créé avec succès"
+                )
         except Exception as e:
-            logger.error(f"Erreur lors de la création de l'index: {e}")
+            logger.error(f"Erreur lors de la création des index: {e}")
+
+    def _extract_message_data(self, doc: Dict) -> Optional[Dict]:
+        """
+        Extrait les données structurées d'un document pour l'index message.
+
+        Args:
+            doc: Document source complet
+
+        Returns:
+            Dict: Document avec uniquement les données structurées, ou None
+        """
+        # Ne garder que les documents qui ont des données parsées
+        if not doc.get('input_data') or not doc.get('result'):
+            return None
+
+        message_doc = {
+            '@timestamp': doc.get('@timestamp'),
+            'transaction_id': doc.get('transaction_id'),
+            'http_method': doc.get('http_method'),
+            'http_path': doc.get('http_path'),
+            'status_code': doc.get('status_code'),
+            'execution_time_ms': doc.get('execution_time_ms'),
+            'input_data': doc.get('input_data'),
+            'result': doc.get('result')
+        }
+
+        return message_doc
 
     def index_documents(self, documents: List[Dict]) -> int:
         """
         Indexe une liste de documents dans Elasticsearch.
+        - Logs complets dans ml-api-logs
+        - Messages parsés dans ml-api-message
 
         Args:
             documents: Liste de documents à indexer
@@ -128,6 +213,7 @@ class ElasticsearchIndexer:
                     return 0
 
             # Préparer les actions pour bulk insert
+            # 1. Tous les documents vont dans l'index des logs bruts
             actions = [
                 {
                     "_index": self.index,
@@ -135,6 +221,15 @@ class ElasticsearchIndexer:
                 }
                 for doc in documents
             ]
+
+            # 2. Documents avec données parsées dans l'index messages
+            for doc in documents:
+                message_doc = self._extract_message_data(doc)
+                if message_doc:
+                    actions.append({
+                        "_index": self.message_index,
+                        "_source": message_doc
+                    })
 
             # Indexer en masse
             success, errors = bulk(
@@ -156,7 +251,10 @@ class ElasticsearchIndexer:
                     logger.error(f"Erreur d'indexation: {error}")
             else:
                 logger.info(
-                    f"Indexation: {success} documents indexés avec succès"
+                    f"Indexation: {success} documents indexés avec succès "
+                    f"({len(documents)} logs bruts, "
+                    f"{len([d for d in documents if self._extract_message_data(d)])} "
+                    f"messages parsés)"
                 )
 
             return success
