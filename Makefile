@@ -447,6 +447,21 @@ pipeline-clear-indexes:
 	@echo "$(BLUE)Suppression des index Elasticsearch...$(NC)"
 	@$(UV) run python scripts/clear_elasticsearch_indexes.py
 
+## pipeline-deduplicate: Dédoublonne l'index ml-api-message
+pipeline-deduplicate:
+	@echo "$(BLUE)Déduplication de l'index ml-api-message...$(NC)"
+	@$(UV) run python scripts/deduplicate_elasticsearch.py
+
+## pipeline-export-parquet: Exporte ml-api-message vers Parquet
+pipeline-export-parquet:
+	@echo "$(BLUE)Export de ml-api-message vers Parquet...$(NC)"
+	@$(UV) run python scripts/export_elasticsearch_to_parquet.py
+
+## pipeline-analyze-drift: Analyse le drift de données avec Evidently AI
+pipeline-analyze-drift:
+	@echo "$(BLUE)Analyse du drift de données...$(NC)"
+	@$(UV) run python scripts/analyze_data_drift.py
+
 ## pipeline-once: Exécute le pipeline une fois
 pipeline-once:
 	@echo "$(BLUE)Exécution du pipeline (une fois)...$(NC)"

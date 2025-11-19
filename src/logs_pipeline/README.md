@@ -229,6 +229,148 @@ Cette commande supprime les index `ml-api-logs` et `ml-api-message`. Les index s
 
 ⚠️ **Attention** : Cette action est irréversible. Tous les logs indexés seront définitivement supprimés.
 
+### Dédoublonner l'index ml-api-message
+
+Si l'index contient des doublons (même `transaction_id`), vous pouvez les supprimer :
+
+```bash
+make pipeline-deduplicate
+```
+
+Cette commande :
+1. Récupère tous les documents de l'index `ml-api-message`
+2. Groupe les documents par `transaction_id`
+3. Pour chaque groupe, conserve uniquement le document le plus récent (basé sur `@timestamp`)
+4. Supprime les doublons
+
+**Exemple de sortie** :
+```
+Documents avant: 1523
+Doublons supprimés: 245
+Documents après: 1278
+```
+
+**Note** : Les documents sans `transaction_id` sont conservés intacts.
+
+### Exporter vers Parquet
+
+Pour exporter les données de `ml-api-message` vers un fichier Parquet :
+
+```bash
+make pipeline-export-parquet
+```
+
+Cette commande :
+1. Extrait tous les documents de l'index `ml-api-message`
+2. Convertit les données au format DataFrame avec les 14 features de base
+3. Applique le feature engineering pour générer les 14 features dérivées
+4. Ajoute la colonne `target` basée sur la prédiction
+5. Sauvegarde au format Parquet dans `model/inference_dataset.parquet`
+
+**Structure du fichier généré** :
+- 14 features de base (GENDER, AGE, SMOKING, etc.)
+- 14 features dérivées (SMOKING_x_AGE, RESPIRATORY_SYMPTOMS, etc.)
+- 1 colonne target (0 ou 1, basée sur la prédiction)
+- **Total : 29 colonnes** (même format que `model/training_dataset.parquet`)
+
+**Personnaliser le chemin de sortie** :
+```bash
+python scripts/export_elasticsearch_to_parquet.py --output mon_fichier.parquet
+```
+
+**Cas d'usage** :
+- Analyser les prédictions en production
+- Détecter le drift de données (comparer avec training_dataset.parquet)
+- Créer des rapports de performance du modèle
+- Alimenter un dashboard d'analyse
+
+**Exemple de sortie** :
+```
+Documents ES extraits: 1278
+Lignes dans le Parquet: 1278
+Colonnes: 29
+Fichier: model/inference_dataset.parquet (245.6 KB)
+```
+
+### Analyser le drift de données avec Evidently AI
+
+Pour comparer le dataset d'entraînement avec les données de production et détecter le drift :
+
+```bash
+make pipeline-analyze-drift
+```
+
+Cette commande :
+1. Charge le dataset de référence (`model/training_dataset.parquet`)
+2. Charge le dataset de production (`model/inference_dataset.parquet`)
+3. Génère un rapport HTML interactif avec Evidently AI
+4. Affiche un résumé textuel du drift dans la console
+5. Sauvegarde le rapport dans `reports/data_drift_report.html`
+
+**Métriques analysées** :
+- **Data Drift** : Détection du drift pour chaque feature (test de Kolmogorov-Smirnov)
+- **Data Quality** : Valeurs manquantes, duplications, types de données
+- **Target Drift** : Évolution de la distribution de la variable cible
+
+**Exemple de sortie console** :
+```
+============================================================
+Résumé du drift de données
+============================================================
+
+Taille des datasets:
+  Référence: 309 lignes
+  Production: 1,278 lignes
+
+Distribution de la target:
+  Référence: 87.4% positifs
+  Production: 92.1% positifs
+  Drift: 4.7%
+  ✓ Drift de target acceptable (<5%)
+
+Drift des features principales:
+  AGE:
+    Moyenne: 62.73 → 65.12 (drift: 2.39)
+    KS test: stat=0.0823, p=0.3421
+    ✓ Pas de drift significatif
+
+  SMOKING:
+    Moyenne: 0.74 → 0.81 (drift: 0.07)
+    KS test: stat=0.1245, p=0.0287
+    ⚠ Drift détecté (p < 0.05)
+
+============================================================
+Conclusion:
+============================================================
+⚠ Drift modéré détecté
+  1 feature(s) avec drift: SMOKING
+  Surveillance recommandée
+============================================================
+
+✓ Rapport HTML disponible: reports/data_drift_report.html
+  Ouvrez-le dans votre navigateur pour voir les détails
+```
+
+**Personnaliser les chemins** :
+```bash
+python scripts/analyze_data_drift.py \
+    --reference model/training_dataset.parquet \
+    --current model/inference_dataset.parquet \
+    --output reports/mon_rapport.html
+```
+
+**Ouvrir le rapport HTML** :
+```bash
+# Le rapport contient des visualisations interactives :
+# - Graphiques de distribution pour chaque feature
+# - Heatmap des corrélations
+# - Tests statistiques détaillés
+# - Recommandations d'action
+
+open reports/data_drift_report.html  # macOS
+xdg-open reports/data_drift_report.html  # Linux
+```
+
 ## Arrêter le pipeline
 
 Pour arrêter Elasticsearch et Kibana :
