@@ -44,6 +44,11 @@ class Settings:
     LOGGING_HANDLER: str = os.getenv("LOGGING_HANDLER", "stdout")
     UI_LOG_LEVEL: str = os.getenv("UI_LOG_LEVEL", "INFO")
 
+    # Configuration du Performance Monitoring
+    ENABLE_PERFORMANCE_MONITORING: bool = os.getenv(
+        "ENABLE_PERFORMANCE_MONITORING", "false"
+    ).lower() in ("true", "1", "yes")
+
     # Configuration du Simulateur
     SIMULATOR_API_URL: str = os.getenv(
         "SIMULATOR_API_URL", "http://localhost:8000"

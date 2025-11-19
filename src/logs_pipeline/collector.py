@@ -225,6 +225,12 @@ class LogCollector:
             document: Document à enrichir
             message: Message de log
         """
+        # Extraire transaction_id (entre crochets au début du message)
+        transaction_pattern = r'^\[([^\]]+)\]'
+        match = re.search(transaction_pattern, message)
+        if match:
+            document['transaction_id'] = match.group(1)
+
         # Extraire méthode et path
         api_call_pattern = r'API Call - (?P<method>\w+) (?P<path>/[\w/]+)'
         match = re.search(api_call_pattern, message)
@@ -245,24 +251,45 @@ class LogCollector:
             document['execution_time_ms'] = float(match.group(1))
 
         # Extraire input data (JSON)
-        input_pattern = r'Input: ({.+?})'
+        # Pattern amélioré pour capturer le JSON complet jusqu'au " - Result:"
+        input_pattern = r'Input: (\{[^}]*(?:\{[^}]*\}[^}]*)*\})'
         match = re.search(input_pattern, message)
         if match:
             try:
                 import json
-                document['input_data'] = json.loads(match.group(1))
-            except json.JSONDecodeError:
-                pass
+                input_json_str = match.group(1)
+                # Normaliser les noms de champs avec espaces
+                replacements = {
+                    '"ALCOHOL CONSUMING"': '"ALCOHOL"',
+                    '"SHORTNESS OF BREATH"': '"SHORTNESS_OF_BREATH"',
+                    '"SWALLOWING DIFFICULTY"': '"SWALLOWING_DIFFICULTY"',
+                    '"CHEST PAIN"': '"CHEST_PAIN"',
+                    '"CHRONIC DISEASE"': '"CHRONIC_DISEASE"',
+                    '"YELLOW FINGERS"': '"YELLOW_FINGERS"',
+                    '"PEER PRESSURE"': '"PEER_PRESSURE"',
+                }
+                for old, new in replacements.items():
+                    input_json_str = input_json_str.replace(old, new)
+
+                document['input_data'] = json.loads(input_json_str)
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"Impossible de parser input_data: {e}. "
+                    f"JSON: {match.group(1)[:100]}"
+                )
 
         # Extraire result data (JSON)
-        result_pattern = r'Result: ({.+?})$'
+        result_pattern = r'Result: (\{[^}]*(?:\{[^}]*\}[^}]*)*\})'
         match = re.search(result_pattern, message)
         if match:
             try:
                 import json
                 document['result'] = json.loads(match.group(1))
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"Impossible de parser result: {e}. "
+                    f"JSON: {match.group(1)[:100]}"
+                )
 
     def collect(self, limit: Optional[int] = None) -> List[Dict]:
         """
@@ -324,6 +351,10 @@ class LogCollector:
                     document['input_data'] = data['input_data']
                 if 'result' in data:
                     document['result'] = data['result']
+            else:
+                # Si data est null, parser le message pour extraire les infos
+                message = log_entry.get('message', '')
+                self._extract_additional_fields(document, message)
 
             documents.append(document)
             self.processed_logs.add(log_hash)

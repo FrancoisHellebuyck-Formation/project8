@@ -39,6 +39,7 @@ help:
 	@echo "  make test-coverage    - Lance les tests avec couverture"
 	@echo "  make test-api         - Lance les tests de l'API uniquement"
 	@echo "  make test-model       - Lance les tests du modèle uniquement"
+	@echo "  make test-performance - Test le monitoring de performance"
 	@echo "  make test-gradio-api-local  - Test l'API Gradio (local)"
 	@echo "  make test-gradio-api-hf     - Test l'API Gradio (HuggingFace)"
 	@echo ""
@@ -156,6 +157,13 @@ test-model:
 	@$(UV) run pytest tests/model/ -v || \
 		(echo "$(RED)✗ Tests modèle échoués$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Tests modèle passent$(NC)"
+
+## test-performance: Test le monitoring de performance
+test-performance:
+	@echo "$(BLUE)Test du monitoring de performance...$(NC)"
+	@$(UV) run python scripts/test_performance_monitoring.py || \
+		(echo "$(RED)✗ Tests de performance échoués$(NC)" && exit 1)
+	@echo "$(GREEN)✓ Tests de performance passent$(NC)"
 
 ## test-gradio-api-local: Test l'API Gradio en local
 test-gradio-api-local:
@@ -431,6 +439,36 @@ pipeline-check:
 	else \
 		$(UV) run python scripts/check_pipeline_prerequisites.py; \
 	fi
+
+## pipeline-test-indexes: Teste la création des index Elasticsearch
+pipeline-test-indexes:
+	@echo "$(BLUE)Test de création des index Elasticsearch...$(NC)"
+	@$(UV) run python scripts/test_elasticsearch_indexes.py
+
+## pipeline-test-parsing: Teste le parsing des logs
+pipeline-test-parsing:
+	@echo "$(BLUE)Test du parsing des logs...$(NC)"
+	@$(UV) run python scripts/test_log_parsing.py
+
+## pipeline-clear-indexes: Vide les index Elasticsearch
+pipeline-clear-indexes:
+	@echo "$(BLUE)Suppression des index Elasticsearch...$(NC)"
+	@$(UV) run python scripts/clear_elasticsearch_indexes.py
+
+## pipeline-deduplicate: Dédoublonne l'index ml-api-message
+pipeline-deduplicate:
+	@echo "$(BLUE)Déduplication de l'index ml-api-message...$(NC)"
+	@$(UV) run python scripts/deduplicate_elasticsearch.py
+
+## pipeline-export-parquet: Exporte ml-api-message vers Parquet
+pipeline-export-parquet:
+	@echo "$(BLUE)Export de ml-api-message vers Parquet...$(NC)"
+	@$(UV) run python scripts/export_elasticsearch_to_parquet.py
+
+## pipeline-analyze-drift: Analyse le drift de données avec Evidently AI
+pipeline-analyze-drift:
+	@echo "$(BLUE)Analyse du drift de données...$(NC)"
+	@$(UV) run python scripts/analyze_data_drift.py
 
 ## pipeline-once: Exécute le pipeline une fois
 pipeline-once:
