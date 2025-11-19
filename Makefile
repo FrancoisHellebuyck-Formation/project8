@@ -39,6 +39,7 @@ help:
 	@echo "  make test-coverage    - Lance les tests avec couverture"
 	@echo "  make test-api         - Lance les tests de l'API uniquement"
 	@echo "  make test-model       - Lance les tests du modèle uniquement"
+	@echo "  make test-performance - Test le monitoring de performance"
 	@echo "  make test-gradio-api-local  - Test l'API Gradio (local)"
 	@echo "  make test-gradio-api-hf     - Test l'API Gradio (HuggingFace)"
 	@echo ""
@@ -156,6 +157,13 @@ test-model:
 	@$(UV) run pytest tests/model/ -v || \
 		(echo "$(RED)✗ Tests modèle échoués$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Tests modèle passent$(NC)"
+
+## test-performance: Test le monitoring de performance
+test-performance:
+	@echo "$(BLUE)Test du monitoring de performance...$(NC)"
+	@$(UV) run python scripts/test_performance_monitoring.py || \
+		(echo "$(RED)✗ Tests de performance échoués$(NC)" && exit 1)
+	@echo "$(GREEN)✓ Tests de performance passent$(NC)"
 
 ## test-gradio-api-local: Test l'API Gradio en local
 test-gradio-api-local:

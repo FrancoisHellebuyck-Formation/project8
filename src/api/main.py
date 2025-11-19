@@ -23,6 +23,7 @@ from .logging_config import (
     is_redis_connected,
     setup_logging,
 )
+from .performance_monitor import performance_monitor
 from .schemas import (
     HealthResponse,
     LogsResponse,
@@ -254,17 +255,24 @@ async def predict(patient: PatientData):
         # Convertir les données Pydantic en dict
         patient_dict = patient.model_dump(by_alias=True)
 
-        # Effectuer la prédiction
-        prediction = predictor.predict(patient_dict)
-        pred_value = int(prediction[0])
+        # Profiler la prédiction si le monitoring est activé
+        with performance_monitor.profile():
+            # Effectuer la prédiction
+            prediction = predictor.predict(patient_dict)
+            pred_value = int(prediction[0])
 
-        # Obtenir la probabilité si disponible
-        probability = None
-        try:
-            proba = predictor.predict_proba(patient_dict)
-            probability = float(proba[0][1])  # Probabilité classe positive
-        except Exception:
-            pass
+            # Obtenir la probabilité si disponible
+            probability = None
+            try:
+                proba = predictor.predict_proba(patient_dict)
+                probability = float(proba[0][1])  # Probabilité classe positive  # noqa: E501
+            except Exception:
+                pass
+
+        # Récupérer et logger les métriques de performance
+        metrics = performance_monitor.get_metrics()
+        if metrics:
+            performance_monitor.log_metrics(metrics)
 
         # Message de résultat
         message = (
@@ -311,13 +319,20 @@ async def predict_proba(patient: PatientData):
         # Convertir les données Pydantic en dict
         patient_dict = patient.model_dump(by_alias=True)
 
-        # Effectuer la prédiction avec probabilités
-        probabilities = predictor.predict_proba(patient_dict)
-        proba_list = probabilities[0].tolist()
+        # Profiler la prédiction si le monitoring est activé
+        with performance_monitor.profile():
+            # Effectuer la prédiction avec probabilités
+            probabilities = predictor.predict_proba(patient_dict)
+            proba_list = probabilities[0].tolist()
 
-        # Obtenir la prédiction
-        prediction = predictor.predict(patient_dict)
-        pred_value = int(prediction[0])
+            # Obtenir la prédiction
+            prediction = predictor.predict(patient_dict)
+            pred_value = int(prediction[0])
+
+        # Récupérer et logger les métriques de performance
+        metrics = performance_monitor.get_metrics()
+        if metrics:
+            performance_monitor.log_metrics(metrics)
 
         message = (
             "Prédiction positive"
