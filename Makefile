@@ -175,7 +175,7 @@ test-gradio-api-local:
 	@echo "$(BLUE)Test de l'API Gradio (local)...$(NC)"
 	@echo "$(YELLOW)URL: $(GRADIO_LOCAL_URL)$(NC)"
 	@echo "$(YELLOW)Assurez-vous que l'API et Gradio tournent localement$(NC)"
-	@GRADIO_URL=$(GRADIO_LOCAL_URL) $(PYTHON) test_gradio_api.py || \
+	@GRADIO_URL=$(GRADIO_LOCAL_URL) $(UV) run python3 test_gradio_api.py || \
 		(echo "$(RED)✗ Tests Gradio API échoués$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Tests Gradio API passent$(NC)"
 
@@ -186,11 +186,11 @@ test-gradio-api-hf:
 	@if [ -f .env ]; then \
 		echo "$(YELLOW)Chargement de HF_TOKEN depuis .env...$(NC)"; \
 		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
-		GRADIO_URL=$(GRADIO_HF_URL) $(PYTHON) test_gradio_api.py || \
+		GRADIO_URL=$(GRADIO_HF_URL) $(UV) run python3 test_gradio_api.py || \
 		(echo "$(RED)✗ Tests Gradio API échoués$(NC)" && exit 1); \
 	else \
 		echo "$(YELLOW)⚠️  Fichier .env non trouvé, test sans token$(NC)"; \
-		GRADIO_URL=$(GRADIO_HF_URL) $(PYTHON) test_gradio_api.py || \
+		GRADIO_URL=$(GRADIO_HF_URL) $(UV) run python3 test_gradio_api.py || \
 		(echo "$(RED)✗ Tests Gradio API échoués$(NC)" && exit 1); \
 	fi
 	@echo "$(GREEN)✓ Tests Gradio API passent$(NC)"
