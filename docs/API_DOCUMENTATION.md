@@ -248,18 +248,54 @@ Récupère des statistiques sur les logs.
 
 **Méthode** : `DELETE`
 
-Supprime tous les logs stockés dans Redis.
+Vide complètement le cache des logs stockés dans Redis.
 
-**Réponse** :
+⚠️ **Important** : Cet endpoint vide **uniquement** le cache Redis local. Les logs déjà indexés dans Elasticsearch ne sont **pas affectés**.
+
+**Réponse succès** :
 ```json
 {
   "message": "Logs supprimés avec succès"
 }
 ```
 
-**Exemple cURL** :
+**Réponse erreur** :
+```json
+{
+  "detail": "Échec de la suppression des logs"
+}
+```
+
+**Exemples d'utilisation** :
+
 ```bash
+# Avec cURL
 curl -X DELETE "http://localhost:8000/logs"
+
+# Avec Makefile (recommandé)
+make clear-logs
+
+# Avec httpie
+http DELETE http://localhost:8000/logs
+
+# Avec Python
+import requests
+response = requests.delete("http://localhost:8000/logs")
+print(response.json())
+```
+
+**Cas d'usage** :
+- Nettoyage après des tests de charge
+- Maintenance périodique du cache Redis
+- Reset avant un nouveau test de performance
+
+**Note** : Pour supprimer à la fois le cache Redis ET les index Elasticsearch :
+```bash
+# 1. Vider le cache Redis
+make clear-logs
+
+# 2. Vider les index Elasticsearch
+make pipeline-clear-indexes
 ```
 
 ## Validation des données

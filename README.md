@@ -214,12 +214,22 @@ L'interface permet de :
 
 ## 📚 Documentation
 
+### Documentation principale
 - [CLAUDE.md](CLAUDE.md) - Règles de développement et architecture
-- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Documentation complète de l'API
-- [UI_DOCUMENTATION.md](UI_DOCUMENTATION.md) - Documentation de l'interface Gradio
-- [FEATURE_ENGINEERING.md](FEATURE_ENGINEERING.md) - Feature engineering automatique
-- [ENV_VARIABLES.md](ENV_VARIABLES.md) - Variables d'environnement
-- [MAKEFILE_GUIDE.md](MAKEFILE_GUIDE.md) - Guide du Makefile
+- [README.md](README.md) - Ce fichier
+
+### Documentation technique (dossier docs/)
+- [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) - Documentation complète de l'API
+- [docs/UI_DOCUMENTATION.md](docs/UI_DOCUMENTATION.md) - Documentation de l'interface Gradio
+- [docs/FEATURE_ENGINEERING.md](docs/FEATURE_ENGINEERING.md) - Feature engineering automatique
+- [docs/ENV_VARIABLES.md](docs/ENV_VARIABLES.md) - Variables d'environnement
+- [docs/MAKEFILE_GUIDE.md](docs/MAKEFILE_GUIDE.md) - Guide du Makefile
+- [docs/PERFORMANCE_METRICS.md](docs/PERFORMANCE_METRICS.md) - Métriques de performance détaillées
+- [docs/CLEAR_LOGS_ENDPOINT.md](docs/CLEAR_LOGS_ENDPOINT.md) - Endpoint pour vider le cache Redis
+
+### HuggingFace Spaces
+- [docs/README_HF.md](docs/README_HF.md) - README pour HuggingFace Spaces
+- [docs/SETUP_HF_TOKEN.md](docs/SETUP_HF_TOKEN.md) - Configuration du token HuggingFace
 
 ## 🛠️ Développement
 
