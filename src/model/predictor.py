@@ -56,8 +56,19 @@ class Predictor:
                 data
             )
 
-            # Effectuer la prédiction
+            # S'assurer que les colonnes sont dans le bon ordre
+            # pour éviter les warnings sklearn
             model = self.model_loader.model
+            if hasattr(model, 'feature_names_in_'):
+                # Réordonner les colonnes selon l'ordre du modèle
+                processed_data = processed_data[model.feature_names_in_]
+
+            # Configurer le pipeline pour conserver les DataFrames
+            # et éviter les warnings de feature names
+            if hasattr(model, 'set_output'):
+                model.set_output(transform="pandas")
+
+            # Effectuer la prédiction
             predictions = model.predict(processed_data)
 
             return predictions
@@ -104,6 +115,17 @@ class Predictor:
             processed_data = self.feature_engineer.engineer_features(
                 data
             )
+
+            # S'assurer que les colonnes sont dans le bon ordre
+            # pour éviter les warnings sklearn
+            if hasattr(model, 'feature_names_in_'):
+                # Réordonner les colonnes selon l'ordre du modèle
+                processed_data = processed_data[model.feature_names_in_]
+
+            # Configurer le pipeline pour conserver les DataFrames
+            # et éviter les warnings de feature names
+            if hasattr(model, 'set_output'):
+                model.set_output(transform="pandas")
 
             # Effectuer la prédiction de probabilités
             probabilities = model.predict_proba(processed_data)

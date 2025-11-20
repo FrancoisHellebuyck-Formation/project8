@@ -350,3 +350,25 @@ class TestPredictorEdgeCases:
 
         result = predictor.predict(data_old)
         assert result is not None
+
+    def test_predict_no_feature_names_warning(self, sample_patient_data):
+        """Vérifie qu'aucun warning de feature names n'est émis."""
+        import warnings
+
+        predictor = Predictor()
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+
+            # Faire une prédiction
+            predictor.predict(sample_patient_data)
+
+            # Vérifier qu'aucun warning de feature names n'a été émis
+            feature_warnings = [
+                warning for warning in w
+                if 'feature names' in str(warning.message).lower()
+            ]
+
+            assert len(feature_warnings) == 0, (
+                f"Warning de feature names détecté: {feature_warnings}"
+            )
