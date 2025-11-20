@@ -269,3 +269,19 @@ def test_api_predict_proba_with_monitoring(
     assert "probabilities" in data
     assert "message" in data
     assert len(data["probabilities"]) == 2
+
+
+def test_performance_monitor_uses_api_logger():
+    """
+    Vérifie que le performance monitor utilise le logger 'api'
+    qui est configuré avec Redis/stdout.
+    """
+    from src.api import performance_monitor
+    import logging
+
+    # Vérifier que le logger utilisé est bien "api"
+    assert performance_monitor.logger.name == "api"
+
+    # Vérifier que c'est le même logger que celui configuré
+    api_logger = logging.getLogger("api")
+    assert performance_monitor.logger is api_logger
