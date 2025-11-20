@@ -58,6 +58,15 @@ async def lifespan(app: FastAPI):
         logger.error(error_msg)
         raise RuntimeError(error_msg) from e
 
+    # Afficher l'état du monitoring de performance
+    if settings.ENABLE_PERFORMANCE_MONITORING:
+        logger.info(
+            "⚡ Performance monitoring: ACTIVÉ "
+            "(métriques: CPU, RAM, latence, throughput)"
+        )
+    else:
+        logger.info("Performance monitoring: désactivé")
+
     yield
 
     # Shutdown
