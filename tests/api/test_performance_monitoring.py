@@ -285,3 +285,113 @@ def test_performance_monitor_uses_api_logger():
     # Vérifier que c'est le même logger que celui configuré
     api_logger = logging.getLogger("api")
     assert performance_monitor.logger is api_logger
+
+
+def test_performance_metrics_include_transaction_id(
+    caplog,
+    enable_performance_monitoring
+):
+    """
+    Vérifie que les métriques de performance incluent un transaction_id
+    quand il est fourni.
+    """
+    import json
+    import logging
+    from importlib import reload
+    from src import config
+    reload(config)
+    from src.api import performance_monitor
+    reload(performance_monitor)
+
+    # Configurer caplog pour capturer les logs "api"
+    caplog.set_level(logging.INFO, logger="api")
+
+    monitor = performance_monitor.PerformanceMonitor()
+
+    # Créer des métriques de test
+    metrics = performance_monitor.PerformanceMetrics(
+        inference_time_ms=25.5,
+        cpu_time_ms=24.8,
+        memory_mb=256.0,
+        memory_delta_mb=2.5,
+        function_calls=1000,
+        top_functions=[
+            {
+                'function': 'test_func',
+                'file': 'test.py',
+                'line': 10,
+                'calls': 1,
+                'total_time_ms': 10.0,
+                'cumulative_time_ms': 20.0
+            }
+        ]
+    )
+
+    # Logger avec un transaction_id
+    test_transaction_id = "test-uuid-12345"
+    monitor.log_metrics(metrics, test_transaction_id)
+
+    # Vérifier que le log contient le transaction_id
+    assert len(caplog.records) > 0
+    log_message = caplog.records[-1].message
+
+    # Parser le JSON
+    log_data = json.loads(log_message)
+    assert "performance_metrics" in log_data
+    assert "transaction_id" in log_data["performance_metrics"]
+    assert log_data["performance_metrics"]["transaction_id"] == (
+        test_transaction_id
+    )
+
+
+def test_performance_metrics_without_transaction_id(
+    caplog,
+    enable_performance_monitoring
+):
+    """
+    Vérifie que les métriques de performance fonctionnent sans
+    transaction_id.
+    """
+    import json
+    import logging
+    from importlib import reload
+    from src import config
+    reload(config)
+    from src.api import performance_monitor
+    reload(performance_monitor)
+
+    # Configurer caplog pour capturer les logs "api"
+    caplog.set_level(logging.INFO, logger="api")
+
+    monitor = performance_monitor.PerformanceMonitor()
+
+    # Créer des métriques de test
+    metrics = performance_monitor.PerformanceMetrics(
+        inference_time_ms=25.5,
+        cpu_time_ms=24.8,
+        memory_mb=256.0,
+        memory_delta_mb=2.5,
+        function_calls=1000,
+        top_functions=[
+            {
+                'function': 'test_func',
+                'file': 'test.py',
+                'line': 10,
+                'calls': 1,
+                'total_time_ms': 10.0,
+                'cumulative_time_ms': 20.0
+            }
+        ]
+    )
+
+    # Logger sans transaction_id
+    monitor.log_metrics(metrics)
+
+    # Vérifier que le log ne contient pas de transaction_id
+    assert len(caplog.records) > 0
+    log_message = caplog.records[-1].message
+
+    # Parser le JSON
+    log_data = json.loads(log_message)
+    assert "performance_metrics" in log_data
+    assert "transaction_id" not in log_data["performance_metrics"]

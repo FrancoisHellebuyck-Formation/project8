@@ -2,7 +2,9 @@
 Filtre de logs pour le pipeline.
 
 Ce module filtre les logs selon un pattern défini dans la configuration.
-Par défaut, seuls les logs contenant "API Call - POST /predict" sont gardés.
+Par défaut, sont gardés :
+- Les logs contenant "API Call - POST /predict"
+- Les logs de métriques de performance (contenant "performance_metrics")
 """
 
 import logging
@@ -72,6 +74,10 @@ class LogFilter:
         http_path = document.get('http_path', '')
         http_method = document.get('http_method', '')
         if http_path == '/predict' and http_method == 'POST':
+            return True
+
+        # Accepter les logs de métriques de performance
+        if 'performance_metrics' in message:
             return True
 
         return False

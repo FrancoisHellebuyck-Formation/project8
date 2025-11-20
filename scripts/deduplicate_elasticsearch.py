@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Script pour dédoublonner l'index ml-api-message dans Elasticsearch.
+Script pour dédoublonner les index Elasticsearch.
+
+Dédouplonne:
+- ml-api-message: Messages de prédiction (basé sur transaction_id)
+- ml-api-perfs: Métriques de performance (basé sur transaction_id)
 
 La déduplication se fait sur la base du champ 'transaction_id'.
 Seul le document le plus récent (basé sur @timestamp) est conservé.
@@ -52,45 +56,42 @@ def parse_timestamp(timestamp_str: str) -> datetime:
         return datetime.min
 
 
-def main():
-    """Point d'entrée principal."""
-    from src.logs_pipeline.indexer import ElasticsearchIndexer
+def deduplicate_index(indexer, index_name: str) -> dict:
+    """
+    Déduplique un index Elasticsearch.
 
+    Args:
+        indexer: Instance d'ElasticsearchIndexer
+        index_name: Nom de l'index à dédoublonner
+
+    Returns:
+        dict: Statistiques de déduplication
+    """
     logger.info("=" * 60)
-    logger.info("Déduplication de l'index ml-api-message")
+    logger.info(f"Déduplication de l'index {index_name}")
     logger.info("=" * 60)
-
-    # Créer l'indexeur
-    indexer = ElasticsearchIndexer()
-
-    # Se connecter
-    logger.info("\nConnexion à Elasticsearch...")
-    if not indexer.connect():
-        logger.error("✗ Impossible de se connecter à Elasticsearch")
-        logger.error(
-            "  Assurez-vous qu'Elasticsearch est démarré avec: "
-            "make pipeline-elasticsearch-up"
-        )
-        sys.exit(1)
-
-    logger.info("✓ Connexion réussie")
 
     # Vérifier que l'index existe
-    if not indexer.client.indices.exists(index=indexer.message_index):
+    if not indexer.client.indices.exists(index=index_name):
         logger.warning(
-            f"\n⊘ L'index '{indexer.message_index}' n'existe pas"
+            f"\n⊘ L'index '{index_name}' n'existe pas"
         )
         logger.info("  Rien à dédoublonner")
-        indexer.close()
-        sys.exit(0)
+        return {
+            'index': index_name,
+            'total_docs': 0,
+            'deleted': 0,
+            'errors': 0,
+            'exists': False
+        }
 
     # Récupérer tous les documents
-    logger.info(f"\nRécupération des documents de '{indexer.message_index}'...")
+    logger.info(f"\nRécupération des documents de '{index_name}'...")
 
     try:
         # Utiliser scroll pour récupérer tous les documents
         response = indexer.client.search(
-            index=indexer.message_index,
+            index=index_name,
             scroll='2m',
             size=1000,
             body={
@@ -172,8 +173,13 @@ def main():
 
         if not duplicates_to_delete:
             logger.info("\n✓ Aucun doublon trouvé, l'index est déjà propre")
-            indexer.close()
-            sys.exit(0)
+            return {
+                'index': index_name,
+                'total_docs': total_docs,
+                'deleted': 0,
+                'errors': 0,
+                'exists': True
+            }
 
         # Supprimer les doublons
         logger.info(f"\nSuppression de {len(duplicates_to_delete)} doublons...")
@@ -184,7 +190,7 @@ def main():
         for doc_id in duplicates_to_delete:
             try:
                 indexer.client.delete(
-                    index=indexer.message_index,
+                    index=index_name,
                     id=doc_id
                 )
                 deleted_count += 1
@@ -195,10 +201,7 @@ def main():
                 errors += 1
 
         # Rafraîchir l'index
-        indexer.client.indices.refresh(index=indexer.message_index)
-
-        # Fermer la connexion
-        indexer.close()
+        indexer.client.indices.refresh(index=index_name)
 
         # Résumé
         logger.info("\n" + "=" * 60)
@@ -214,15 +217,101 @@ def main():
             logger.warning(
                 f"✓ Déduplication terminée avec {errors} erreur(s)"
             )
-            sys.exit(1)
         else:
             logger.info("✓ SUCCÈS: Déduplication terminée sans erreur")
-            sys.exit(0)
+
+        return {
+            'index': index_name,
+            'total_docs': total_docs,
+            'deleted': deleted_count,
+            'errors': errors,
+            'exists': True
+        }
 
     except Exception as e:
         logger.error(f"\n✗ Erreur lors de la déduplication: {e}")
-        indexer.close()
+        return {
+            'index': index_name,
+            'total_docs': 0,
+            'deleted': 0,
+            'errors': 1,
+            'exists': True
+        }
+
+
+def main():
+    """Point d'entrée principal."""
+    from src.logs_pipeline.indexer import ElasticsearchIndexer
+
+    logger.info("=" * 70)
+    logger.info("Déduplication des index Elasticsearch")
+    logger.info("=" * 70)
+
+    # Créer l'indexeur
+    indexer = ElasticsearchIndexer()
+
+    # Se connecter
+    logger.info("\nConnexion à Elasticsearch...")
+    if not indexer.connect():
+        logger.error("✗ Impossible de se connecter à Elasticsearch")
+        logger.error(
+            "  Assurez-vous qu'Elasticsearch est démarré avec: "
+            "make pipeline-elasticsearch-up"
+        )
         sys.exit(1)
+
+    logger.info("✓ Connexion réussie\n")
+
+    # Dédoublonner les index
+    indexes = [
+        indexer.message_index,  # ml-api-message
+        indexer.perf_index       # ml-api-perfs
+    ]
+
+    results = []
+    for index_name in indexes:
+        result = deduplicate_index(indexer, index_name)
+        results.append(result)
+        logger.info("")  # Ligne vide entre les index
+
+    # Fermer la connexion
+    indexer.close()
+
+    # Résumé global
+    logger.info("=" * 70)
+    logger.info("RÉSUMÉ GLOBAL DE LA DÉDUPLICATION")
+    logger.info("=" * 70)
+
+    total_deleted = 0
+    total_errors = 0
+
+    for result in results:
+        if result['exists']:
+            logger.info(
+                f"  {result['index']:20} : "
+                f"{result['deleted']} doublons supprimés "
+                f"(sur {result['total_docs']} documents)"
+            )
+            total_deleted += result['deleted']
+            total_errors += result['errors']
+        else:
+            logger.info(
+                f"  {result['index']:20} : n'existe pas (ignoré)"
+            )
+
+    logger.info("")
+    logger.info(f"  Total doublons supprimés : {total_deleted}")
+    logger.info(f"  Total erreurs            : {total_errors}")
+    logger.info("=" * 70)
+
+    if total_errors > 0:
+        logger.warning(
+            f"\n✓ Déduplication terminée avec {total_errors} erreur(s)"
+        )
+        sys.exit(1)
+    else:
+        logger.info("\n✓ SUCCÈS: Déduplication terminée sans erreur")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
