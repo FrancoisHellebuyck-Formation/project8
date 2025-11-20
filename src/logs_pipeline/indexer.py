@@ -269,22 +269,32 @@ class ElasticsearchIndexer:
 
         return None
 
-    def index_documents(self, documents: List[Dict]) -> int:
+    def index_documents(
+        self,
+        all_documents: List[Dict],
+        filtered_documents: Optional[List[Dict]] = None
+    ) -> int:
         """
-        Indexe une liste de documents dans Elasticsearch.
-        - Logs complets dans ml-api-logs
-        - Messages parsés dans ml-api-message
-        - Métriques de performance dans ml-api-perfs
+        Indexe les documents dans Elasticsearch.
+        - Tous les logs (bruts, non filtrés) dans ml-api-logs
+        - Messages parsés (filtrés) dans ml-api-message
+        - Métriques de performance (filtrés) dans ml-api-perfs
 
         Args:
-            documents: Liste de documents à indexer
+            all_documents: Liste de TOUS les documents (non filtrés)
+            filtered_documents: Liste des documents filtrés (optionnel).
+                               Si None, utilise all_documents
 
         Returns:
             int: Nombre de documents indexés avec succès
         """
-        if not documents:
+        if not all_documents:
             logger.info("Aucun document à indexer")
             return 0
+
+        # Si aucun document filtré fourni, utiliser tous les documents
+        if filtered_documents is None:
+            filtered_documents = all_documents
 
         try:
             if self.client is None:
@@ -292,17 +302,17 @@ class ElasticsearchIndexer:
                     return 0
 
             # Préparer les actions pour bulk insert
-            # 1. Tous les documents vont dans l'index des logs bruts
+            # 1. TOUS les documents vont dans l'index des logs bruts (sans filtrage)  # noqa: E501
             actions = [
                 {
                     "_index": self.index,
                     "_source": doc
                 }
-                for doc in documents
+                for doc in all_documents
             ]
 
-            # 2. Documents avec données parsées dans l'index messages
-            for doc in documents:
+            # 2. Documents FILTRÉS avec données parsées dans l'index messages
+            for doc in filtered_documents:
                 message_doc = self._extract_message_data(doc)
                 if message_doc:
                     actions.append({
@@ -310,8 +320,8 @@ class ElasticsearchIndexer:
                         "_source": message_doc
                     })
 
-            # 3. Documents avec métriques de performance dans l'index perfs
-            for doc in documents:
+            # 3. Documents FILTRÉS avec métriques de performance dans l'index perfs  # noqa: E501
+            for doc in filtered_documents:
                 perf_doc = self._extract_perf_data(doc)
                 if perf_doc:
                     actions.append({
@@ -339,14 +349,14 @@ class ElasticsearchIndexer:
                     logger.error(f"Erreur d'indexation: {error}")
             else:
                 message_count = len(
-                    [d for d in documents if self._extract_message_data(d)]
+                    [d for d in filtered_documents if self._extract_message_data(d)]  # noqa: E501
                 )
                 perf_count = len(
-                    [d for d in documents if self._extract_perf_data(d)]
+                    [d for d in filtered_documents if self._extract_perf_data(d)]  # noqa: E501
                 )
                 logger.info(
                     f"Indexation: {success} documents indexés avec succès "
-                    f"({len(documents)} logs bruts, "
+                    f"({len(all_documents)} logs bruts, "
                     f"{message_count} messages parsés, "
                     f"{perf_count} métriques de performance)"
                 )

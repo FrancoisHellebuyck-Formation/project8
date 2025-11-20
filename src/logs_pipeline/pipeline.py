@@ -178,13 +178,14 @@ class LogsPipeline:
                 f"(sur {stats['collected']})"
             )
 
-            if not filtered_documents:
-                logger.info("Aucun log ne correspond au filtre")
-                return stats
-
             # 3. Indexer dans Elasticsearch
+            # IMPORTANT: Tous les logs vont dans ml-api-logs (documents)
+            # Seuls les logs filtrés vont dans ml-api-message et ml-api-perfs
             logger.info("Indexation dans Elasticsearch...")
-            indexed = self.indexer.index_documents(filtered_documents)
+            indexed = self.indexer.index_documents(
+                all_documents=documents,
+                filtered_documents=filtered_documents
+            )
             stats["indexed"] = indexed
             logger.info(f"{indexed} documents indexés")
 
