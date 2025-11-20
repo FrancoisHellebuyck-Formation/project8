@@ -134,9 +134,11 @@ Quand le monitoring est activé, chaque prédiction génère un log JSON structu
 Les logs de performance peuvent être consultés via :
 
 1. **Endpoint `/logs`** de l'API
-2. **Redis** (si configuré)
-3. **stdout** (logs console)
+2. **Redis** (si configuré avec `LOGGING_HANDLER=redis`)
+3. **stdout** (logs console, si `LOGGING_HANDLER=stdout`)
 4. **Elasticsearch** (si le pipeline de logs est actif)
+
+**Important :** Le module `performance_monitor` utilise le logger `"api"` configuré par `setup_logging()`. Cela garantit que tous les logs de performance sont envoyés vers le même système que les autres logs de l'API (Redis, Elasticsearch, ou stdout selon la configuration).
 
 ## Tests
 
@@ -148,6 +150,10 @@ python scripts/test_performance_monitoring.py
 
 # Ou via Makefile
 make test-performance
+
+# Démonstration avec Redis (nécessite Redis en cours d'exécution)
+LOGGING_HANDLER=redis ENABLE_PERFORMANCE_MONITORING=true \
+    python scripts/demo_redis_performance_logs.py
 ```
 
 ### Tests unitaires

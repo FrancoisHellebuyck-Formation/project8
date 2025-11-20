@@ -25,7 +25,8 @@ import os
 
 from src.config import settings
 
-logger = logging.getLogger(__name__)
+# Utiliser le logger "api" configuré avec Redis/stdout
+logger = logging.getLogger("api")
 
 
 @dataclass
