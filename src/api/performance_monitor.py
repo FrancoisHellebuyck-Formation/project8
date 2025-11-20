@@ -178,12 +178,17 @@ class PerformanceMonitor:
 
         return top_functions
 
-    def log_metrics(self, metrics: Optional[PerformanceMetrics]):
+    def log_metrics(
+        self,
+        metrics: Optional[PerformanceMetrics],
+        transaction_id: Optional[str] = None
+    ):
         """
         Log les métriques de performance en format JSON.
 
         Args:
             metrics: Métriques à logger
+            transaction_id: ID unique de la transaction (optionnel)
         """
         if metrics is None or not self.enabled:
             return
@@ -214,6 +219,12 @@ class PerformanceMonitor:
                 ]
             }
         }
+
+        # Ajouter l'ID de transaction si fourni
+        if transaction_id:
+            metrics_dict['performance_metrics']['transaction_id'] = (
+                transaction_id
+            )
 
         # Logger en JSON
         logger.info(json.dumps(metrics_dict))

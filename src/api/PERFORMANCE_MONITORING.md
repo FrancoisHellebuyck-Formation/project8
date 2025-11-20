@@ -78,6 +78,7 @@ Quand le monitoring est activé, chaque prédiction génère un log JSON structu
 ```json
 {
   "performance_metrics": {
+    "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
     "inference_time_ms": 26.46,
     "cpu_time_ms": 26.35,
     "memory_mb": 263.48,
@@ -115,6 +116,7 @@ Quand le monitoring est activé, chaque prédiction génère un log JSON structu
 ```
 
 **Description des champs :**
+- `transaction_id` : ID unique de la transaction (UUID) - permet de corréler les logs de performance avec les logs d'API
 - `inference_time_ms` : Temps total d'exécution de la prédiction
 - `cpu_time_ms` : Temps CPU consommé
 - `memory_mb` : Utilisation mémoire totale
@@ -137,8 +139,12 @@ Les logs de performance peuvent être consultés via :
 2. **Redis** (si configuré avec `LOGGING_HANDLER=redis`)
 3. **stdout** (logs console, si `LOGGING_HANDLER=stdout`)
 4. **Elasticsearch** (si le pipeline de logs est actif)
+   - Les métriques de performance sont automatiquement indexées dans l'index **`ml-api-perfs`**
+   - Cet index contient uniquement les métriques structurées pour faciliter l'analyse
 
 **Important :** Le module `performance_monitor` utilise le logger `"api"` configuré par `setup_logging()`. Cela garantit que tous les logs de performance sont envoyés vers le même système que les autres logs de l'API (Redis, Elasticsearch, ou stdout selon la configuration).
+
+**Corrélation avec les logs d'API :** Chaque log de performance contient un `transaction_id` (UUID) qui correspond à l'ID de transaction de la requête API. Cela permet de facilement corréler les métriques de performance avec les logs d'accès API et les résultats de prédiction dans le même système de logging.
 
 ## Tests
 
@@ -211,6 +217,7 @@ Log JSON complet :
 ```json
 {
   "performance_metrics": {
+    "transaction_id": "7a3b2f1c-9e8d-4c5b-a6f7-123456789abc",
     "inference_time_ms": 23.55,
     "cpu_time_ms": 23.46,
     "memory_mb": 232.41,

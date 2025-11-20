@@ -243,12 +243,13 @@ async def health_check():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-async def predict(patient: PatientData):
+async def predict(patient: PatientData, request: Request):
     """
     Effectue une prédiction pour un patient.
 
     Args:
         patient: Données du patient (14 features de base).
+        request: Objet Request pour accéder au transaction_id.
 
     Returns:
         PredictionResponse: Résultat de la prédiction.
@@ -278,10 +279,13 @@ async def predict(patient: PatientData):
             except Exception:
                 pass
 
+        # Récupérer le transaction_id si disponible
+        transaction_id = getattr(request.state, 'transaction_id', None)
+
         # Récupérer et logger les métriques de performance
         metrics = performance_monitor.get_metrics()
         if metrics:
-            performance_monitor.log_metrics(metrics)
+            performance_monitor.log_metrics(metrics, transaction_id)
 
         # Message de résultat
         message = (
@@ -307,12 +311,13 @@ async def predict(patient: PatientData):
     response_model=PredictionProbabilityResponse,
     tags=["Prediction"]
 )
-async def predict_proba(patient: PatientData):
+async def predict_proba(patient: PatientData, request: Request):
     """
     Effectue une prédiction avec probabilités pour un patient.
 
     Args:
         patient: Données du patient (14 features de base).
+        request: Objet Request pour accéder au transaction_id.
 
     Returns:
         PredictionProbabilityResponse: Résultat avec probabilités.
@@ -338,10 +343,13 @@ async def predict_proba(patient: PatientData):
             prediction = predictor.predict(patient_dict)
             pred_value = int(prediction[0])
 
+        # Récupérer le transaction_id si disponible
+        transaction_id = getattr(request.state, 'transaction_id', None)
+
         # Récupérer et logger les métriques de performance
         metrics = performance_monitor.get_metrics()
         if metrics:
-            performance_monitor.log_metrics(metrics)
+            performance_monitor.log_metrics(metrics, transaction_id)
 
         message = (
             "Prédiction positive"

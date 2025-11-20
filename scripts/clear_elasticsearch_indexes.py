@@ -53,6 +53,7 @@ def main():
     indexes_to_delete = [
         indexer.index,           # ml-api-logs
         indexer.message_index,   # ml-api-message
+        indexer.perf_index,      # ml-api-perfs
     ]
 
     logger.info("\n" + "=" * 60)

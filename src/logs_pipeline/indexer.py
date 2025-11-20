@@ -47,6 +47,7 @@ class ElasticsearchIndexer:
         self.port = port or config.elasticsearch_port
         self.index = index or config.elasticsearch_index
         self.message_index = "ml-api-message"  # Index pour messages parsés
+        self.perf_index = "ml-api-perfs"  # Index pour métriques de performance  # noqa: E501
         self.client: Optional[Elasticsearch] = None
 
     def connect(self) -> bool:
@@ -161,6 +162,40 @@ class ElasticsearchIndexer:
                 logger.info(
                     f"Index '{self.message_index}' créé avec succès"
                 )
+
+            # Index pour les métriques de performance
+            if not self.client.indices.exists(index=self.perf_index):
+                perf_mapping = {
+                    "mappings": {
+                        "properties": {
+                            "@timestamp": {"type": "date"},
+                            "transaction_id": {"type": "keyword"},
+                            "inference_time_ms": {"type": "float"},
+                            "cpu_time_ms": {"type": "float"},
+                            "memory_mb": {"type": "float"},
+                            "memory_delta_mb": {"type": "float"},
+                            "function_calls": {"type": "integer"},
+                            "latency_ms": {"type": "float"},
+                            "top_functions": {
+                                "type": "nested",
+                                "properties": {
+                                    "function": {"type": "keyword"},
+                                    "file": {"type": "keyword"},
+                                    "line": {"type": "integer"},
+                                    "cumulative_time_ms": {"type": "float"},
+                                    "total_time_ms": {"type": "float"},
+                                    "calls": {"type": "integer"}
+                                }
+                            }
+                        }
+                    }
+                }
+                self.client.indices.create(
+                    index=self.perf_index, body=perf_mapping
+                )
+                logger.info(
+                    f"Index '{self.perf_index}' créé avec succès"
+                )
         except Exception as e:
             logger.error(f"Erreur lors de la création des index: {e}")
 
@@ -191,11 +226,55 @@ class ElasticsearchIndexer:
 
         return message_doc
 
+    def _extract_perf_data(self, doc: Dict) -> Optional[Dict]:
+        """
+        Extrait les métriques de performance d'un document.
+
+        Args:
+            doc: Document source complet
+
+        Returns:
+            Dict: Document avec uniquement les métriques de performance,
+                  ou None
+        """
+        import json
+
+        # Chercher "performance_metrics" dans le message
+        message = doc.get('message', '')
+
+        # Essayer de parser le message comme JSON
+        try:
+            parsed = json.loads(message)
+            if 'performance_metrics' in parsed:
+                perf_metrics = parsed['performance_metrics']
+
+                # Créer le document de performance
+                perf_doc = {
+                    '@timestamp': doc.get('@timestamp'),
+                    'transaction_id': perf_metrics.get('transaction_id'),
+                    'inference_time_ms': perf_metrics.get(
+                        'inference_time_ms'
+                    ),
+                    'cpu_time_ms': perf_metrics.get('cpu_time_ms'),
+                    'memory_mb': perf_metrics.get('memory_mb'),
+                    'memory_delta_mb': perf_metrics.get('memory_delta_mb'),
+                    'function_calls': perf_metrics.get('function_calls'),
+                    'latency_ms': perf_metrics.get('latency_ms'),
+                    'top_functions': perf_metrics.get('top_functions', [])
+                }
+
+                return perf_doc
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        return None
+
     def index_documents(self, documents: List[Dict]) -> int:
         """
         Indexe une liste de documents dans Elasticsearch.
         - Logs complets dans ml-api-logs
         - Messages parsés dans ml-api-message
+        - Métriques de performance dans ml-api-perfs
 
         Args:
             documents: Liste de documents à indexer
@@ -231,6 +310,15 @@ class ElasticsearchIndexer:
                         "_source": message_doc
                     })
 
+            # 3. Documents avec métriques de performance dans l'index perfs
+            for doc in documents:
+                perf_doc = self._extract_perf_data(doc)
+                if perf_doc:
+                    actions.append({
+                        "_index": self.perf_index,
+                        "_source": perf_doc
+                    })
+
             # Indexer en masse
             success, errors = bulk(
                 self.client,
@@ -250,11 +338,17 @@ class ElasticsearchIndexer:
                 for error in errors[:3]:  # Afficher les 3 premières erreurs
                     logger.error(f"Erreur d'indexation: {error}")
             else:
+                message_count = len(
+                    [d for d in documents if self._extract_message_data(d)]
+                )
+                perf_count = len(
+                    [d for d in documents if self._extract_perf_data(d)]
+                )
                 logger.info(
                     f"Indexation: {success} documents indexés avec succès "
                     f"({len(documents)} logs bruts, "
-                    f"{len([d for d in documents if self._extract_message_data(d)])} "
-                    f"messages parsés)"
+                    f"{message_count} messages parsés, "
+                    f"{perf_count} métriques de performance)"
                 )
 
             return success

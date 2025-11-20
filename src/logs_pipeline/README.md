@@ -25,9 +25,10 @@ Filtre les logs selon un pattern défini :
 - Vérifie le message, le path HTTP et la méthode
 
 ### 4. `indexer.py` - Indexeur Elasticsearch
-Indexe les logs dans Elasticsearch avec une double indexation :
+Indexe les logs dans Elasticsearch avec une triple indexation :
 - **Index `ml-api-logs`** : Logs bruts complets avec tous les champs
 - **Index `ml-api-message`** : Messages parsés avec uniquement les données structurées (input_data, result)
+- **Index `ml-api-perfs`** : Métriques de performance (transaction_id, temps d'inférence, CPU, mémoire, etc.)
 - Création automatique des index avec mapping adapté
 - Indexation en masse (bulk insert)
 - Gestion de la connexion
@@ -196,17 +197,19 @@ Contient uniquement les logs qui ont été parsés avec succès (avec input_data
   - probability (0.0 à 1.0)
   - message (texte descriptif)
 
-**Avantages de la double indexation :**
+**Avantages de la triple indexation :**
 - `ml-api-logs` : Pour le débogage et l'audit complet
 - `ml-api-message` : Pour l'analyse des prédictions et du drift de données
+- `ml-api-perfs` : Pour l'analyse des performances et l'optimisation du modèle
 
 ## Visualisation avec Kibana
 
 1. Ouvrir Kibana : http://localhost:5601
 2. Aller dans "Stack Management" > "Index Patterns"
-3. Créer deux index patterns :
+3. Créer trois index patterns :
    - `ml-api-logs*` pour les logs complets
    - `ml-api-message*` pour les messages parsés uniquement
+   - `ml-api-perfs*` pour les métriques de performance
 4. Aller dans "Discover" pour visualiser les logs
 
 ### Tester la création des index
@@ -215,7 +218,7 @@ Contient uniquement les logs qui ont été parsés avec succès (avec input_data
 make pipeline-test-indexes
 ```
 
-Cette commande vérifie que les deux index sont créés avec les bons mappings.
+Cette commande vérifie que les trois index sont créés avec les bons mappings.
 
 ### Vider les index Elasticsearch
 
@@ -225,20 +228,20 @@ Pour supprimer tous les logs indexés et repartir de zéro :
 make pipeline-clear-indexes
 ```
 
-Cette commande supprime les index `ml-api-logs` et `ml-api-message`. Les index seront automatiquement recréés au prochain lancement du pipeline.
+Cette commande supprime les index `ml-api-logs`, `ml-api-message` et `ml-api-perfs`. Les index seront automatiquement recréés au prochain lancement du pipeline.
 
 ⚠️ **Attention** : Cette action est irréversible. Tous les logs indexés seront définitivement supprimés.
 
-### Dédoublonner l'index ml-api-message
+### Dédoublonner les index
 
-Si l'index contient des doublons (même `transaction_id`), vous pouvez les supprimer :
+Si les index contiennent des doublons (même `transaction_id`), vous pouvez les supprimer :
 
 ```bash
 make pipeline-deduplicate
 ```
 
 Cette commande :
-1. Récupère tous les documents de l'index `ml-api-message`
+1. Récupère tous les documents des index `ml-api-message` et `ml-api-perfs`
 2. Groupe les documents par `transaction_id`
 3. Pour chaque groupe, conserve uniquement le document le plus récent (basé sur `@timestamp`)
 4. Supprime les doublons
