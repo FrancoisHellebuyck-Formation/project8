@@ -32,7 +32,6 @@ Requirements:
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -55,7 +54,7 @@ class ElasticsearchMigrator:
         es_host: str = "localhost:9200",
         kibana_host: str = "localhost:5601",
         username: Optional[str] = None,
-        password: Optional[str] = None
+        password: Optional[str] = None,
     ):
         """
         Initialise le migrateur.
@@ -72,8 +71,7 @@ class ElasticsearchMigrator:
         # Connexion Elasticsearch
         if username and password:
             self.es = Elasticsearch(
-                [f"http://{es_host}"],
-                basic_auth=(username, password)
+                [f"http://{es_host}"], basic_auth=(username, password)
             )
         else:
             self.es = Elasticsearch([f"http://{es_host}"])
@@ -88,9 +86,7 @@ class ElasticsearchMigrator:
     # ============= EXPORT INDEX =============
 
     def export_indexes(
-        self,
-        output_dir: Path,
-        index_patterns: List[str] = None
+        self, output_dir: Path, index_patterns: List[str] = None
     ) -> Dict:
         """
         Export les index Elasticsearch.
@@ -121,7 +117,7 @@ class ElasticsearchMigrator:
                 try:
                     # Export mapping
                     mapping_file = output_dir / f"{index_name}_mapping.json"
-                    with open(mapping_file, 'w') as f:
+                    with open(mapping_file, "w") as f:
                         json.dump(index_info, f, indent=2)
                     print(f"    ✓ Mapping sauvegardé: {mapping_file}")
 
@@ -132,34 +128,28 @@ class ElasticsearchMigrator:
                     # Scroll pour récupérer tous les documents
                     response = self.es.search(
                         index=index_name,
-                        scroll='2m',
+                        scroll="2m",
                         size=1000,
-                        body={"query": {"match_all": {}}}
+                        body={"query": {"match_all": {}}},
                     )
 
-                    scroll_id = response['_scroll_id']
-                    hits = response['hits']['hits']
+                    scroll_id = response["_scroll_id"]
+                    hits = response["hits"]["hits"]
 
-                    with open(docs_file, 'w') as f:
+                    with open(docs_file, "w") as f:
                         while hits:
                             for hit in hits:
                                 # Format NDJSON pour réimport facile
                                 doc = {
-                                    "index": {
-                                        "_index": index_name,
-                                        "_id": hit['_id']
-                                    }
+                                    "index": {"_index": index_name, "_id": hit["_id"]}
                                 }
-                                f.write(json.dumps(doc) + '\n')
-                                f.write(json.dumps(hit['_source']) + '\n')
+                                f.write(json.dumps(doc) + "\n")
+                                f.write(json.dumps(hit["_source"]) + "\n")
                                 doc_count += 1
 
-                            response = self.es.scroll(
-                                scroll_id=scroll_id,
-                                scroll='2m'
-                            )
-                            scroll_id = response['_scroll_id']
-                            hits = response['hits']['hits']
+                            response = self.es.scroll(scroll_id=scroll_id, scroll="2m")
+                            scroll_id = response["_scroll_id"]
+                            hits = response["hits"]["hits"]
 
                     self.es.clear_scroll(scroll_id=scroll_id)
 
@@ -173,8 +163,10 @@ class ElasticsearchMigrator:
                     print(f"    ✗ {error_msg}")
                     stats["errors"].append(error_msg)
 
-        print(f"\n✅ Export terminé: {stats['exported']} index, "
-              f"{stats['documents']} documents")
+        print(
+            f"\n✅ Export terminé: {stats['exported']} index, "
+            f"{stats['documents']} documents"
+        )
         return stats
 
     # ============= IMPORT INDEX =============
@@ -209,15 +201,11 @@ class ElasticsearchMigrator:
                     index_config = json.load(f)
 
                 if self.es.indices.exists(index=index_name):
-                    print(f"    ⚠️  Index {index_name} existe déjà, "
-                          "suppression...")
+                    print(f"    ⚠️  Index {index_name} existe déjà, " "suppression...")
                     self.es.indices.delete(index=index_name)
 
-                self.es.indices.create(
-                    index=index_name,
-                    body=index_config
-                )
-                print(f"    ✓ Index créé avec mapping")
+                self.es.indices.create(index=index_name, body=index_config)
+                print("    ✓ Index créé avec mapping")
 
                 # Import documents
                 if docs_file.exists():
@@ -234,15 +222,12 @@ class ElasticsearchMigrator:
 
                                 # Bulk insert par batch de 1000
                                 if len(batch) >= 2000:
-                                    self.es.bulk(
-                                        body=''.join(batch),
-                                        refresh=True
-                                    )
+                                    self.es.bulk(body="".join(batch), refresh=True)
                                     batch = []
 
                     # Dernier batch
                     if batch:
-                        self.es.bulk(body=''.join(batch), refresh=True)
+                        self.es.bulk(body="".join(batch), refresh=True)
 
                     print(f"    ✓ {doc_count} documents importés")
                     stats["documents"] += doc_count
@@ -254,8 +239,10 @@ class ElasticsearchMigrator:
                 print(f"    ✗ {error_msg}")
                 stats["errors"].append(error_msg)
 
-        print(f"\n✅ Import terminé: {stats['imported']} index, "
-              f"{stats['documents']} documents")
+        print(
+            f"\n✅ Import terminé: {stats['imported']} index, "
+            f"{stats['documents']} documents"
+        )
         return stats
 
     # ============= EXPORT DATAVIEWS =============
@@ -280,10 +267,7 @@ class ElasticsearchMigrator:
         try:
             # API Kibana pour récupérer les index patterns
             url = f"{self.kibana_url}/api/saved_objects/_find"
-            params = {
-                "type": "index-pattern",
-                "per_page": 1000
-            }
+            params = {"type": "index-pattern", "per_page": 1000}
 
             response = requests.get(url, params=params, auth=self.auth)
             response.raise_for_status()
@@ -297,7 +281,7 @@ class ElasticsearchMigrator:
 
                 # Sauvegarder chaque dataview
                 output_file = output_dir / f"{dataview_id}.json"
-                with open(output_file, 'w') as f:
+                with open(output_file, "w") as f:
                     json.dump(dataview, f, indent=2)
 
                 print(f"  ✓ Dataview exporté: {dataview_title}")
@@ -341,21 +325,20 @@ class ElasticsearchMigrator:
 
                 # API Kibana pour créer/mettre à jour
                 url = f"{self.kibana_url}/api/saved_objects/index-pattern/{dataview_id}"  # noqa: E501
-                headers = {"kbn-xsrf": "true", "Content-Type": "application/json"}  # noqa: E501
+                headers = {
+                    "kbn-xsrf": "true",
+                    "Content-Type": "application/json",
+                }  # noqa: E501
 
                 response = requests.post(
-                    url,
-                    json=dataview,
-                    headers=headers,
-                    auth=self.auth
+                    url, json=dataview, headers=headers, auth=self.auth
                 )
 
                 if response.status_code in [200, 201]:
                     print(f"  ✓ Dataview importé: {dataview_title}")
                     stats["imported"] += 1
                 else:
-                    raise Exception(f"HTTP {response.status_code}: "
-                                    f"{response.text}")
+                    raise Exception(f"HTTP {response.status_code}: " f"{response.text}")
 
             except Exception as e:
                 error_msg = f"Erreur lors de l'import de {dataview_file.name}: {e}"  # noqa: E501
@@ -387,10 +370,7 @@ class ElasticsearchMigrator:
         try:
             # API Kibana pour récupérer les dashboards
             url = f"{self.kibana_url}/api/saved_objects/_find"
-            params = {
-                "type": "dashboard",
-                "per_page": 1000
-            }
+            params = {"type": "dashboard", "per_page": 1000}
 
             response = requests.get(url, params=params, auth=self.auth)
             response.raise_for_status()
@@ -404,7 +384,7 @@ class ElasticsearchMigrator:
 
                 # Sauvegarder chaque dashboard
                 output_file = output_dir / f"{dashboard_id}.json"
-                with open(output_file, 'w') as f:
+                with open(output_file, "w") as f:
                     json.dump(dashboard, f, indent=2)
 
                 print(f"  ✓ Dashboard exporté: {dashboard_title}")
@@ -412,16 +392,9 @@ class ElasticsearchMigrator:
 
             # Export aussi les visualisations associées
             viz_url = f"{self.kibana_url}/api/saved_objects/_find"
-            viz_params = {
-                "type": "visualization",
-                "per_page": 1000
-            }
+            viz_params = {"type": "visualization", "per_page": 1000}
 
-            viz_response = requests.get(
-                viz_url,
-                params=viz_params,
-                auth=self.auth
-            )
+            viz_response = requests.get(viz_url, params=viz_params, auth=self.auth)
             viz_response.raise_for_status()
 
             viz_data = viz_response.json()
@@ -435,14 +408,13 @@ class ElasticsearchMigrator:
                 viz_title = viz["attributes"]["title"]
 
                 output_file = viz_dir / f"{viz_id}.json"
-                with open(output_file, 'w') as f:
+                with open(output_file, "w") as f:
                     json.dump(viz, f, indent=2)
 
                 print(f"  ✓ Visualisation exportée: {viz_title}")
                 stats["exported"] += 1
 
-            print(f"\n✅ {stats['exported']} dashboards/visualisations "
-                  "exportés")
+            print(f"\n✅ {stats['exported']} dashboards/visualisations " "exportés")
 
         except Exception as e:
             error_msg = f"Erreur lors de l'export des dashboards: {e}"
@@ -482,27 +454,24 @@ class ElasticsearchMigrator:
                     viz_title = viz["attributes"]["title"]
 
                     url = f"{self.kibana_url}/api/saved_objects/visualization/{viz_id}"  # noqa: E501
-                    headers = {
-                        "kbn-xsrf": "true",
-                        "Content-Type": "application/json"
-                    }
+                    headers = {"kbn-xsrf": "true", "Content-Type": "application/json"}
 
                     response = requests.post(
-                        url,
-                        json=viz,
-                        headers=headers,
-                        auth=self.auth
+                        url, json=viz, headers=headers, auth=self.auth
                     )
 
                     if response.status_code in [200, 201]:
                         print(f"  ✓ Visualisation importée: {viz_title}")
                         stats["imported"] += 1
                     else:
-                        raise Exception(f"HTTP {response.status_code}: "
-                                        f"{response.text}")
+                        raise Exception(
+                            f"HTTP {response.status_code}: " f"{response.text}"
+                        )
 
                 except Exception as e:
-                    error_msg = f"Erreur lors de l'import de {viz_file.name}: {e}"  # noqa: E501
+                    error_msg = (
+                        f"Erreur lors de l'import de {viz_file.name}: {e}"  # noqa: E501
+                    )
                     print(f"  ✗ {error_msg}")
                     stats["errors"].append(error_msg)
 
@@ -518,24 +487,17 @@ class ElasticsearchMigrator:
                 dashboard_title = dashboard["attributes"]["title"]
 
                 url = f"{self.kibana_url}/api/saved_objects/dashboard/{dashboard_id}"  # noqa: E501
-                headers = {
-                    "kbn-xsrf": "true",
-                    "Content-Type": "application/json"
-                }
+                headers = {"kbn-xsrf": "true", "Content-Type": "application/json"}
 
                 response = requests.post(
-                    url,
-                    json=dashboard,
-                    headers=headers,
-                    auth=self.auth
+                    url, json=dashboard, headers=headers, auth=self.auth
                 )
 
                 if response.status_code in [200, 201]:
                     print(f"  ✓ Dashboard importé: {dashboard_title}")
                     stats["imported"] += 1
                 else:
-                    raise Exception(f"HTTP {response.status_code}: "
-                                    f"{response.text}")
+                    raise Exception(f"HTTP {response.status_code}: " f"{response.text}")
 
             except Exception as e:
                 error_msg = f"Erreur lors de l'import de {dashboard_file.name}: {e}"  # noqa: E501
@@ -570,16 +532,16 @@ class ElasticsearchMigrator:
             "backup_dir": str(backup_dir),
             "indexes": self.export_indexes(backup_dir),
             "dataviews": self.export_dataviews(backup_dir),
-            "dashboards": self.export_dashboards(backup_dir)
+            "dashboards": self.export_dashboards(backup_dir),
         }
 
         # Sauvegarder les stats
         stats_file = backup_dir / "migration_stats.json"
-        with open(stats_file, 'w') as f:
+        with open(stats_file, "w") as f:
             json.dump(stats, f, indent=2)
 
         print("\n" + "=" * 60)
-        print(f"\n✅ Export complet terminé!")
+        print("\n✅ Export complet terminé!")
         print(f"📁 Backup sauvegardé dans: {backup_dir}")
         print(f"📊 Statistiques: {stats_file}")
 
@@ -607,11 +569,11 @@ class ElasticsearchMigrator:
             "source_dir": str(input_dir),
             "indexes": self.import_indexes(input_dir),
             "dataviews": self.import_dataviews(input_dir),
-            "dashboards": self.import_dashboards(input_dir)
+            "dashboards": self.import_dashboards(input_dir),
         }
 
         print("\n" + "=" * 60)
-        print(f"\n✅ Import complet terminé!")
+        print("\n✅ Import complet terminé!")
 
         return stats
 
@@ -637,106 +599,83 @@ Exemples:
     --output ./backup \\
     --username elastic \\
     --password changeme
-        """
+        """,
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Commande")
 
     # Export complet
     export_parser = subparsers.add_parser("export", help="Export complet")
-    export_parser.add_argument(
-        "--output",
-        required=True,
-        help="Répertoire de sortie"
-    )
+    export_parser.add_argument("--output", required=True, help="Répertoire de sortie")
 
     # Import complet
     import_parser = subparsers.add_parser("import", help="Import complet")
-    import_parser.add_argument(
-        "--input",
-        required=True,
-        help="Répertoire du backup"
-    )
+    import_parser.add_argument("--input", required=True, help="Répertoire du backup")
 
     # Export index
     export_idx_parser = subparsers.add_parser(
-        "export-indexes",
-        help="Export uniquement les index"
+        "export-indexes", help="Export uniquement les index"
     )
     export_idx_parser.add_argument(
-        "--output",
-        required=True,
-        help="Répertoire de sortie"
+        "--output", required=True, help="Répertoire de sortie"
     )
 
     # Import index
     import_idx_parser = subparsers.add_parser(
-        "import-indexes",
-        help="Import uniquement les index"
+        "import-indexes", help="Import uniquement les index"
     )
     import_idx_parser.add_argument(
-        "--input",
-        required=True,
-        help="Répertoire du backup"
+        "--input", required=True, help="Répertoire du backup"
     )
 
     # Export dataviews
     export_dv_parser = subparsers.add_parser(
-        "export-dataviews",
-        help="Export uniquement les dataviews"
+        "export-dataviews", help="Export uniquement les dataviews"
     )
     export_dv_parser.add_argument(
-        "--output",
-        required=True,
-        help="Répertoire de sortie"
+        "--output", required=True, help="Répertoire de sortie"
     )
 
     # Import dataviews
     import_dv_parser = subparsers.add_parser(
-        "import-dataviews",
-        help="Import uniquement les dataviews"
+        "import-dataviews", help="Import uniquement les dataviews"
     )
-    import_dv_parser.add_argument(
-        "--input",
-        required=True,
-        help="Répertoire du backup"
-    )
+    import_dv_parser.add_argument("--input", required=True, help="Répertoire du backup")
 
     # Export dashboards
     export_db_parser = subparsers.add_parser(
-        "export-dashboards",
-        help="Export uniquement les dashboards"
+        "export-dashboards", help="Export uniquement les dashboards"
     )
     export_db_parser.add_argument(
-        "--output",
-        required=True,
-        help="Répertoire de sortie"
+        "--output", required=True, help="Répertoire de sortie"
     )
 
     # Import dashboards
     import_db_parser = subparsers.add_parser(
-        "import-dashboards",
-        help="Import uniquement les dashboards"
+        "import-dashboards", help="Import uniquement les dashboards"
     )
-    import_db_parser.add_argument(
-        "--input",
-        required=True,
-        help="Répertoire du backup"
-    )
+    import_db_parser.add_argument("--input", required=True, help="Répertoire du backup")
 
     # Arguments communs
-    for p in [export_parser, import_parser, export_idx_parser,
-              import_idx_parser, export_dv_parser, import_dv_parser,
-              export_db_parser, import_db_parser]:
+    for p in [
+        export_parser,
+        import_parser,
+        export_idx_parser,
+        import_idx_parser,
+        export_dv_parser,
+        import_dv_parser,
+        export_db_parser,
+        import_db_parser,
+    ]:
         p.add_argument(
             "--es-host",
             default="localhost:9200",
-            help="Hôte Elasticsearch (défaut: localhost:9200)"
+            help="Hôte Elasticsearch (défaut: localhost:9200)",
         )
         p.add_argument(
             "--kibana-host",
             default="localhost:5601",
-            help="Hôte Kibana (défaut: localhost:5601)"
+            help="Hôte Kibana (défaut: localhost:5601)",
         )
         p.add_argument("--username", help="Nom d'utilisateur (optionnel)")
         p.add_argument("--password", help="Mot de passe (optionnel)")
@@ -752,7 +691,7 @@ Exemples:
         es_host=args.es_host,
         kibana_host=args.kibana_host,
         username=args.username,
-        password=args.password
+        password=args.password,
     )
 
     # Exécuter la commande
