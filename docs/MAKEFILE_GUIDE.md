@@ -143,6 +143,24 @@ API_HOST := 0.0.0.0
 API_PORT := 8000
 ```
 
+### Lancer le proxy Gradio
+
+```bash
+make run-proxy
+```
+
+- Démarre l'interface proxy Gradio complète
+- Expose tous les endpoints de l'API FastAPI
+- Accessible sur `http://0.0.0.0:7860`
+- Interface interactive avec 6 sections :
+  - Vérification de connexion
+  - Informations API
+  - Health check
+  - Prédiction ML
+  - Probabilités détaillées
+  - Gestion des logs
+- Voir [PROXY_DOCUMENTATION.md](PROXY_DOCUMENTATION.md) pour plus de détails
+
 ### Lancer Redis
 
 ```bash

@@ -39,6 +39,7 @@ help:
 	@echo "  make test-coverage    - Lance les tests avec couverture"
 	@echo "  make test-api         - Lance les tests de l'API uniquement"
 	@echo "  make test-model       - Lance les tests du modèle uniquement"
+	@echo "  make test-proxy       - Lance les tests du package proxy"
 	@echo "  make test-performance - Test le monitoring de performance"
 	@echo "  make test-gradio-api-local  - Test l'API Gradio (local)"
 	@echo "  make test-gradio-api-hf     - Test l'API Gradio (HuggingFace)"
@@ -46,6 +47,7 @@ help:
 	@echo "$(GREEN)Développement:$(NC)"
 	@echo "  make run-api          - Lance l'API FastAPI"
 	@echo "  make run-ui           - Lance l'interface Gradio"
+	@echo "  make run-proxy        - Lance l'interface proxy (tous endpoints)"
 	@echo "  make run-redis        - Lance Redis avec Docker"
 	@echo "  make stop-redis       - Arrête le conteneur Redis"
 	@echo ""
@@ -205,6 +207,20 @@ run-api:
 		--host $(API_HOST) \
 		--port $(API_PORT) \
 		--reload
+
+## run-proxy: Lance l'interface proxy Gradio (tous les endpoints)
+run-proxy:
+	@echo "$(BLUE)Démarrage du proxy Gradio...$(NC)"
+	@echo "$(YELLOW)Proxy disponible sur http://0.0.0.0:7860$(NC)"
+	@echo "$(YELLOW)Expose tous les endpoints de l'API FastAPI$(NC)"
+	@python3 run_proxy.py
+
+## test-proxy: Lance les tests du package proxy
+test-proxy:
+	@echo "$(BLUE)Lancement des tests du proxy...$(NC)"
+	@$(UV) run pytest tests/test_proxy.py -v || \
+		(echo "$(RED)✗ Tests proxy échoués$(NC)" && exit 1)
+	@echo "$(GREEN)✓ Tests proxy passent$(NC)"
 
 ## run-ui: Lance l'interface Gradio
 run-ui:

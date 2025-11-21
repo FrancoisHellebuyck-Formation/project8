@@ -41,24 +41,27 @@
 │                      INDEXER                                     │
 │                   (indexer.py)                                   │
 │                                                                   │
-│  Triple indexation dans Elasticsearch:                           │
+│  Quadruple indexation dans Elasticsearch:                        │
 └─────────────────────────────────────────────────────────────────┘
-         │                    │                    │
-         │                    │                    │
-         ▼                    ▼                    ▼
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│  ml-api-logs     │  │ ml-api-message   │  │  ml-api-perfs    │
-│  (NON FILTRÉS)   │  │   (FILTRÉS)      │  │   (FILTRÉS)      │
-├──────────────────┤  ├──────────────────┤  ├──────────────────┤
-│ TOUS LES LOGS    │  │ Messages parsés  │  │ Métriques de     │
-│ de l'API sans    │  │ avec input_data  │  │ performance avec │
-│ aucun filtrage   │  │ et result        │  │ transaction_id   │
-│                  │  │                  │  │                  │
-│ Usage:           │  │ Usage:           │  │ Usage:           │
-│ - Débogage       │  │ - Analyse drift  │  │ - Optimisation   │
-│ - Audit complet  │  │ - Prédictions    │  │ - Métriques CPU  │
-│ - Investigation  │  │ - Data science   │  │ - Temps inférence│
-└──────────────────┘  └──────────────────┘  └──────────────────┘
+         │                 │                 │                 │
+         │                 │                 │                 │
+         ▼                 ▼                 ▼                 ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ ml-api-logs  │  │ml-api-message│  │ ml-api-perfs │  │ml-api-top-   │
+│(NON FILTRÉS) │  │  (FILTRÉS)   │  │  (FILTRÉS)   │  │     func     │
+│              │  │              │  │              │  │  (FILTRÉS)   │
+├──────────────┤  ├──────────────┤  ├──────────────┤  ├──────────────┤
+│TOUS LES LOGS │  │Messages      │  │Métriques de  │  │Top functions │
+│de l'API sans │  │parsés avec   │  │performance   │  │dénormalisées │
+│aucun filtrage│  │input_data et │  │avec          │  │(1 doc par    │
+│              │  │result        │  │transaction_id│  │fonction)     │
+│              │  │              │  │              │  │              │
+│Usage:        │  │Usage:        │  │Usage:        │  │Usage:        │
+│- Débogage    │  │- Drift data  │  │- Optimisation│  │- Analyse     │
+│- Audit       │  │- Prédictions │  │- Métriques   │  │  détaillée   │
+│- Traçabilité │  │- Data science│  │- Temps CPU   │  │- Goulots     │
+│              │  │              │  │- Inférence   │  │- Profiling   │
+└──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
 ## Index Elasticsearch
@@ -128,6 +131,29 @@
 - Monitoring de la latence
 - Dashboard de performances système
 
+### 4. ml-api-top-func (FILTRÉS, DÉNORMALISÉS)
+
+**Source**: Documents FILTRÉS extraits de `performance_metrics.top_functions` (dénormalisés)
+
+**Champs**:
+- `@timestamp` : Date/heure du log
+- `transaction_id` : ID unique de la transaction parent
+- `function` : Nom de la fonction
+- `file` : Fichier source
+- `line` : Numéro de ligne
+- `cumulative_time_ms` : Temps cumulé en ms
+- `total_time_ms` : Temps total en ms
+- `calls` : Nombre d'appels
+
+**Cas d'usage**:
+- Analyse détaillée des fonctions les plus coûteuses
+- Identification rapide des goulots d'étranglement
+- Profiling et optimisation ciblée
+- Requêtes Elasticsearch simplifiées sur les fonctions individuelles
+
+**Dénormalisation**:
+Chaque fonction dans `top_functions` est extraite comme un document séparé, avec le `transaction_id` parent pour traçabilité.
+
 ## Modules
 
 ### config.py
@@ -137,7 +163,7 @@ Gère la configuration du pipeline via variables d'environnement.
 Récupère TOUS les logs depuis l'API Gradio HuggingFace.
 
 ### filter.py
-Filtre les logs pour identifier ceux qui doivent être parsés et indexés dans `ml-api-message` et `ml-api-perfs`.
+Filtre les logs pour identifier ceux qui doivent être parsés et indexés dans `ml-api-message`, `ml-api-perfs` et `ml-api-top-func`.
 
 **Critères d'acceptation**:
 1. Message contient "API Call - POST /predict"
@@ -145,10 +171,11 @@ Filtre les logs pour identifier ceux qui doivent être parsés et indexés dans 
 3. http_path == "/predict" ET http_method == "POST"
 
 ### indexer.py
-Indexe les documents dans Elasticsearch avec triple indexation:
+Indexe les documents dans Elasticsearch avec quadruple indexation:
 - **TOUS les logs** → `ml-api-logs` (pas de filtrage)
 - **Logs filtrés parsés** → `ml-api-message` (avec input_data et result)
 - **Logs filtrés de performance** → `ml-api-perfs` (avec performance_metrics)
+- **Top functions dénormalisées** → `ml-api-top-func` (1 doc par fonction)
 
 ### pipeline.py
 Orchestre le flux complet:
@@ -156,7 +183,7 @@ Orchestre le flux complet:
 2. Filtre les logs pour identifier les prédictions et métriques
 3. Indexe:
    - TOUS les logs dans `ml-api-logs`
-   - Logs filtrés dans `ml-api-message` et `ml-api-perfs`
+   - Logs filtrés dans `ml-api-message`, `ml-api-perfs` et `ml-api-top-func`
 
 ## Exemple de flux
 
@@ -171,18 +198,20 @@ Orchestre le flux complet:
 - ✅ Indexé dans `ml-api-logs` (log complet brut)
 - ✅ Indexé dans `ml-api-message` (données parsées structurées)
 - ❌ NON indexé dans `ml-api-perfs` (pas de métriques de performance)
+- ❌ NON indexé dans `ml-api-top-func` (pas de top_functions)
 
 ### Log de métriques de performance
 
 **Entrée Gradio**:
 ```
-2025-01-20 10:30:01 - api - INFO - {"performance_metrics": {"transaction_id": "abc-123", "inference_time_ms": 25.5, "cpu_time_ms": 18.2, ...}}
+2025-01-20 10:30:01 - api - INFO - {"performance_metrics": {"transaction_id": "abc-123", "inference_time_ms": 25.5, "cpu_time_ms": 18.2, "top_functions": [{"function": "predict", "file": "model.py", "cumulative_time_ms": 20.1, ...}, {"function": "preprocess", "file": "utils.py", "cumulative_time_ms": 5.2, ...}]}}
 ```
 
 **Résultat**:
 - ✅ Indexé dans `ml-api-logs` (log complet brut)
 - ❌ NON indexé dans `ml-api-message` (pas de input_data/result)
-- ✅ Indexé dans `ml-api-perfs` (métriques extraites)
+- ✅ Indexé dans `ml-api-perfs` (métriques extraites avec top_functions nested)
+- ✅ Indexé dans `ml-api-top-func` (2 documents créés, 1 par fonction, avec transaction_id parent)
 
 ### Log système générique
 
@@ -195,6 +224,7 @@ Orchestre le flux complet:
 - ✅ Indexé dans `ml-api-logs` (log complet brut)
 - ❌ NON indexé dans `ml-api-message` (pas une prédiction)
 - ❌ NON indexé dans `ml-api-perfs` (pas de métriques)
+- ❌ NON indexé dans `ml-api-top-func` (pas de top_functions)
 
 ## Avantages de cette architecture
 
@@ -202,6 +232,7 @@ Orchestre le flux complet:
 - **ml-api-logs**: Vue exhaustive pour le débogage
 - **ml-api-message**: Données métier pour l'analyse
 - **ml-api-perfs**: Métriques techniques pour l'optimisation
+- **ml-api-top-func**: Profiling détaillé des fonctions
 
 ### 2. Performance des requêtes
 Chaque index est optimisé pour son cas d'usage avec des mappings spécifiques.
@@ -210,7 +241,10 @@ Chaque index est optimisé pour son cas d'usage avec des mappings spécifiques.
 Le filtrage peut être ajusté sans perdre les données brutes qui restent dans `ml-api-logs`.
 
 ### 4. Traçabilité complète
-Grâce au `transaction_id`, on peut joindre les données des 3 index pour une vue 360° d'une transaction.
+Grâce au `transaction_id`, on peut joindre les données des 4 index pour une vue 360° d'une transaction.
 
 ### 5. Conformité et audit
 `ml-api-logs` conserve TOUS les logs pour la traçabilité et l'audit complet.
+
+### 6. Analyse détaillée des performances
+La dénormalisation des `top_functions` dans `ml-api-top-func` permet des requêtes Elasticsearch directes sur les fonctions individuelles sans parcourir les objets nested.

@@ -36,6 +36,12 @@ Le projet est structuré en 3 parties principales :
 - Cases à cocher pour les paramètres binaires
 - Communique avec l'API FastAPI
 
+### 4. Package Proxy (`./src/proxy`)
+- Proxy complet Gradio ↔ FastAPI
+- Expose tous les endpoints de l'API via interface Gradio
+- Client Python pour utilisation programmatique
+- Tests unitaires complets (couverture ~95%)
+
 ### Infrastructure
 
 - **Docker 1** : API + Modèle ML
@@ -74,6 +80,14 @@ Le projet est structuré en 3 parties principales :
 - ✅ Gestion des erreurs
 - ✅ Communication avec l'API
 
+### Package Proxy
+- ✅ Client Python pour tous les endpoints API
+- ✅ Interface Gradio complète (6 sections)
+- ✅ Gestion uniforme des erreurs et timeouts
+- ✅ Support des prédictions en batch
+- ✅ Tests unitaires avec mocks (~95% couverture)
+- ✅ Documentation complète avec exemples
+
 ## 🚀 Installation
 
 ### Prérequis
@@ -97,6 +111,9 @@ make run-api
 
 # Dans un troisième terminal, lancer l'interface Gradio
 make run-ui
+
+# Ou lancer le proxy complet (tous les endpoints)
+make run-proxy
 ```
 
 ### Installation manuelle
@@ -139,6 +156,7 @@ make install-dev      # Développement
 # Développement
 make run-api          # Lancer l'API
 make run-ui           # Lancer l'interface Gradio
+make run-proxy        # Lancer le proxy (tous endpoints)
 make run-redis        # Lancer Redis
 make dev             # Environnement complet
 
@@ -227,6 +245,7 @@ L'interface permet de :
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Architecture technique complète et flux de données
 - [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) - Documentation complète de l'API
 - [docs/UI_DOCUMENTATION.md](docs/UI_DOCUMENTATION.md) - Documentation de l'interface Gradio
+- [docs/PROXY_DOCUMENTATION.md](docs/PROXY_DOCUMENTATION.md) - Documentation du package proxy complet
 - [docs/FEATURE_ENGINEERING.md](docs/FEATURE_ENGINEERING.md) - Feature engineering automatique
 - [docs/ENV_VARIABLES.md](docs/ENV_VARIABLES.md) - Variables d'environnement
 - [docs/MAKEFILE_GUIDE.md](docs/MAKEFILE_GUIDE.md) - Guide du Makefile
@@ -254,12 +273,19 @@ project8/
 │   │   └── feature_engineering.py
 │   ├── ui/               # Interface Gradio
 │   │   └── app.py        # Application Gradio
+│   ├── proxy/            # Package proxy
+│   │   ├── client.py     # Client API
+│   │   └── gradio_app.py # Interface proxy
 │   └── config.py         # Configuration (.env)
 ├── model/                # Modèle ML entraîné
 │   └── model.pkl
 ├── tests/                # Tests
+│   └── test_proxy.py     # Tests du proxy
+├── docs/                 # Documentation
+│   └── PROXY_DOCUMENTATION.md
 ├── .env                  # Variables d'environnement (ne pas commiter)
 ├── .env.example          # Template .env
+├── run_proxy.py          # Script de lancement proxy
 ├── pyproject.toml        # Dépendances
 ├── Makefile              # Commandes utiles
 └── README.md

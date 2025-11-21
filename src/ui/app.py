@@ -7,6 +7,7 @@ du poumon via l'API FastAPI.
 """
 
 import json
+import os
 
 import gradio as gr
 import requests
@@ -16,6 +17,25 @@ from .logging_config import setup_ui_logger
 
 # Configurer le logger UI
 logger = setup_ui_logger(log_level=settings.UI_LOG_LEVEL)
+
+# Détecter si on est sur HuggingFace Spaces
+IS_HUGGINGFACE_SPACE = os.getenv("SPACE_ID") is not None
+
+# Import conditionnel du package proxy pour HuggingFace
+if IS_HUGGINGFACE_SPACE:
+    try:
+        from ..proxy import APIProxyClient
+        proxy_client = APIProxyClient()
+        logger.info("✅ Package proxy chargé pour HuggingFace Spaces")
+    except ImportError:
+        logger.warning("⚠️  Package proxy non disponible, utilisation des"
+                       " fonctions proxy locales")
+        IS_HUGGINGFACE_SPACE = False
+        proxy_client = None
+else:
+    proxy_client = None
+    logger.info("ℹ️  Environnement local détecté, utilisation des fonctions"
+                " proxy simples")
 
 
 def predict(
@@ -216,57 +236,82 @@ def create_probability_bar(probability: float, error: bool = False) -> str:
 
 def api_health_proxy():
     """Proxy vers l'endpoint /health de FastAPI."""
-    try:
-        response = requests.get(f"{settings.API_URL}/health", timeout=5)
-        return response.json(), response.status_code
-    except Exception as e:
-        return {"error": str(e)}, 503
+    if IS_HUGGINGFACE_SPACE and proxy_client:
+        # Utiliser le package proxy sur HuggingFace
+        return proxy_client.get_health()
+    else:
+        # Utiliser la fonction proxy simple en local
+        try:
+            response = requests.get(f"{settings.API_URL}/health", timeout=5)
+            return response.json(), response.status_code
+        except Exception as e:
+            return {"error": str(e)}, 503
 
 
 def api_predict_proxy(payload: dict):
     """Proxy vers l'endpoint /predict de FastAPI."""
-    try:
-        response = requests.post(
-            f"{settings.API_URL}/predict", json=payload, timeout=10
-        )
-        return response.json(), response.status_code
-    except Exception as e:
-        return {"error": str(e)}, 503
+    if IS_HUGGINGFACE_SPACE and proxy_client:
+        # Utiliser le package proxy sur HuggingFace
+        return proxy_client.post_predict(payload)
+    else:
+        # Utiliser la fonction proxy simple en local
+        try:
+            response = requests.post(
+                f"{settings.API_URL}/predict", json=payload, timeout=10
+            )
+            return response.json(), response.status_code
+        except Exception as e:
+            return {"error": str(e)}, 503
 
 
 def api_predict_proba_proxy(payload: dict):
     """Proxy vers l'endpoint /predict_proba de FastAPI."""
-    try:
-        response = requests.post(
-            f"{settings.API_URL}/predict_proba", json=payload, timeout=10
-        )
-        return response.json(), response.status_code
-    except Exception as e:
-        return {"error": str(e)}, 503
+    if IS_HUGGINGFACE_SPACE and proxy_client:
+        # Utiliser le package proxy sur HuggingFace
+        return proxy_client.post_predict_proba(payload)
+    else:
+        # Utiliser la fonction proxy simple en local
+        try:
+            response = requests.post(
+                f"{settings.API_URL}/predict_proba", json=payload, timeout=10
+            )
+            return response.json(), response.status_code
+        except Exception as e:
+            return {"error": str(e)}, 503
 
 
 def api_logs_proxy(limit: int = 100, offset: int = 0):
     """Proxy vers l'endpoint /logs de FastAPI avec pagination."""
-    try:
-        response = requests.get(
-            f"{settings.API_URL}/logs?limit={limit}&offset={offset}",
-            timeout=10
-        )
-        return response.json(), response.status_code
-    except Exception as e:
-        return {"error": str(e)}, 503
+    if IS_HUGGINGFACE_SPACE and proxy_client:
+        # Utiliser le package proxy sur HuggingFace
+        return proxy_client.get_logs(limit=limit, offset=offset)
+    else:
+        # Utiliser la fonction proxy simple en local
+        try:
+            response = requests.get(
+                f"{settings.API_URL}/logs?limit={limit}&offset={offset}",
+                timeout=10
+            )
+            return response.json(), response.status_code
+        except Exception as e:
+            return {"error": str(e)}, 503
 
 
 def api_clear_logs_proxy():
     """Proxy vers l'endpoint DELETE /logs de FastAPI."""
-    try:
-        response = requests.delete(
-            f"{settings.API_URL}/logs",
-            timeout=10
-        )
-        return response.json(), response.status_code
-    except Exception as e:
-        return {"error": str(e)}, 503
+    if IS_HUGGINGFACE_SPACE and proxy_client:
+        # Utiliser le package proxy sur HuggingFace
+        return proxy_client.delete_logs()
+    else:
+        # Utiliser la fonction proxy simple en local
+        try:
+            response = requests.delete(
+                f"{settings.API_URL}/logs",
+                timeout=10
+            )
+            return response.json(), response.status_code
+        except Exception as e:
+            return {"error": str(e)}, 503
 
 
 def create_interface() -> gr.Blocks:
