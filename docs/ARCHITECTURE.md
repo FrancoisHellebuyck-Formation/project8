@@ -8,9 +8,11 @@ Ce document décrit l'architecture technique complète du projet, incluant les c
 
 - [Architecture globale](#architecture-globale)
 - [Composants principaux](#composants-principaux)
+- [Déploiement HuggingFace Spaces](#déploiement-huggingface-spaces)
 - [Flux de données](#flux-de-données)
 - [Infrastructure Docker](#infrastructure-docker)
 - [Pipeline de logs](#pipeline-de-logs)
+- [Migration Elasticsearch](#migration-elasticsearch)
 - [Monitoring et performance](#monitoring-et-performance)
 - [Sécurité et scalabilité](#sécurité-et-scalabilité)
 
@@ -67,29 +69,61 @@ Ce document décrit l'architecture technique complète du projet, incluant les c
 
 ## Composants principaux
 
-### 1. Interface utilisateur (Gradio)
+### 1. Interface utilisateur (Gradio + FastAPI)
 
-**Localisation** : `src/ui/app.py`
+**Localisation** :
+- `src/ui/app.py` - Interface Gradio
+- `src/ui/fastapi_app.py` - Application FastAPI+Gradio hybride (HuggingFace Spaces)
+- `src/ui/api_routes.py` - Routes API REST
+
+**Deux modes de déploiement** :
+
+#### Mode 1: Gradio standalone (développement local)
+```
+Gradio UI (Port 7860) → API FastAPI (Port 8000)
+```
+
+#### Mode 2: FastAPI+Gradio hybride (HuggingFace Spaces)
+```
+FastAPI (Port 7860)
+├── /api/* → Endpoints REST (curl, HTTP)
+└── / → Interface Gradio UI
+```
 
 **Responsabilités** :
 - Interface web intuitive pour les utilisateurs finaux
 - Formulaire de saisie des données patient (14 features)
-- Communication avec l'API FastAPI
+- Communication avec l'API FastAPI (proxy client)
 - Affichage des résultats de prédiction
+- **[NOUVEAU]** Accès HTTP direct sans client Gradio (HF Spaces)
 
 **Technologies** :
 - Gradio 4.0+
+- FastAPI 0.104+
 - Python 3.13+
 
 **Endpoints exposés** :
-- `/` : Interface principale
-- `/logs_api` : Endpoint pour le pipeline de logs
+
+| Endpoint | Type | Description |
+|----------|------|-------------|
+| `/` | Gradio UI | Interface principale |
+| `/logs_api` | Gradio | Endpoint pour le pipeline de logs |
+| `/api/health` | REST | Health check (HF Spaces) |
+| `/api/predict` | REST | Prédiction ML (HF Spaces) |
+| `/api/predict_proba` | REST | Probabilités (HF Spaces) |
+| `/api/logs` | REST | Récupération logs (HF Spaces) |
+
+Documentation complète: [DIRECT_HTTP_ACCESS.md](DIRECT_HTTP_ACCESS.md)
 
 **Flux de données** :
 ```
 Utilisateur → Formulaire Gradio → Validation → HTTP POST → API FastAPI
                                                                   ↓
 Utilisateur ← Affichage résultat ← JSON Response ← Prédiction ML ←
+
+OU (HuggingFace Spaces):
+
+curl/HTTP → /api/predict → API Proxy → API FastAPI (8000) → Résultat JSON
 ```
 
 ### 2. API REST (FastAPI)
@@ -270,7 +304,7 @@ pipeline.py   →  Orchestration du processus complet
                     └─────────────────┘
 ```
 
-**Triple indexation** :
+**Quadruple indexation** :
 
 1. **ml-api-logs** : TOUS les logs sans filtrage
    - Usage : Débogage complet, audit
@@ -283,6 +317,10 @@ pipeline.py   →  Orchestration du processus complet
 3. **ml-api-perfs** : Logs filtrés avec métriques de performance
    - Usage : Optimisation du modèle
    - Contenu : inference_time_ms, cpu_time_ms, memory_mb, etc.
+
+4. **ml-api-top-func** : Top fonctions coûteuses par transaction
+   - Usage : Profiling détaillé, optimisation du code
+   - Contenu : transaction_id, function_name, cumulative_time, calls, etc.
 
 Documentation complète : [src/logs_pipeline/README.md](../src/logs_pipeline/README.md)
 
@@ -302,6 +340,7 @@ Documentation complète : [src/logs_pipeline/README.md](../src/logs_pipeline/REA
 - `ml-api-logs*` : Tous les logs
 - `ml-api-message*` : Logs de prédictions
 - `ml-api-perfs*` : Métriques de performance
+- `ml-api-top-func*` : Profiling fonctions
 
 **Dashboards recommandés** :
 1. **Dashboard Prédictions** :
@@ -317,6 +356,162 @@ Documentation complète : [src/logs_pipeline/README.md](../src/logs_pipeline/REA
    - Top fonctions coûteuses
 
 Documentation : [PERFORMANCE_METRICS.md](PERFORMANCE_METRICS.md)
+
+## Déploiement HuggingFace Spaces
+
+### Architecture hybride FastAPI + Gradio
+
+Le projet utilise une architecture hybride innovante pour le déploiement sur HuggingFace Spaces, permettant **l'accès HTTP/REST direct sans client Gradio**.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│        HuggingFace Space (Port 7860)                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │  FastAPI (Application principale)                  │   │
+│  │                                                      │   │
+│  │  Endpoints REST API (/api/*)                       │   │
+│  │  ├── GET  /api/health                              │   │
+│  │  ├── GET  /api/                                    │   │
+│  │  ├── POST /api/predict                             │   │
+│  │  ├── POST /api/predict_proba                       │   │
+│  │  ├── GET  /api/logs                                │   │
+│  │  └── DELETE /api/logs                              │   │
+│  │                                                      │   │
+│  └────────────────────────────────────────────────────┘   │
+│                       ↑                                     │
+│                       │ gr.mount_gradio_app()               │
+│                       ↓                                     │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │  Gradio UI (Interface montée sur /)               │   │
+│  │  - Formulaire de prédiction                        │   │
+│  │  - Affichage résultats                             │   │
+│  └────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+                    Proxy vers API interne
+                              ↓
+                   ┌──────────────────┐
+                   │ API FastAPI      │
+                   │ (Port 8000)      │
+                   │ - Modèle ML      │
+                   │ - Redis logs     │
+                   └──────────────────┘
+```
+
+### Composants du déploiement
+
+**Fichiers clés** :
+
+| Fichier | Rôle |
+|---------|------|
+| `src/ui/fastapi_app.py` | App FastAPI principale avec Gradio monté |
+| `src/ui/api_routes.py` | Définition des routes REST (référence) |
+| `src/proxy/client.py` | Client HTTP pour communiquer avec l'API (port 8000) |
+| `docker/Dockerfile.hf` | Dockerfile HuggingFace avec start.sh |
+
+### Avantages de cette architecture
+
+| Avant | Après |
+|-------|-------|
+| ❌ Client Gradio Python requis | ✅ Accès HTTP standard (curl, fetch, requests) |
+| ❌ Format propriétaire Gradio | ✅ Format JSON REST standard |
+| ❌ Intégration difficile | ✅ Compatible tous langages (Python, JS, R) |
+| ⚠️ UI seulement | ✅ UI **ET** API REST |
+
+### Utilisation
+
+**Via l'interface web** :
+```
+https://francoisformation-oc-project8.hf.space/
+```
+
+**Via API REST** :
+```bash
+# Health check
+curl https://francoisformation-oc-project8.hf.space/api/health
+
+# Prédiction
+curl -X POST https://francoisformation-oc-project8.hf.space/api/predict \
+  -H "Content-Type: application/json" \
+  -d '{"AGE": 65, "GENDER": 1, "SMOKING": 1, ...}'
+```
+
+Documentation complète :
+- [DIRECT_HTTP_ACCESS.md](DIRECT_HTTP_ACCESS.md) - Guide complet (550 lignes)
+- [QUICK_START_HTTP_ACCESS.md](QUICK_START_HTTP_ACCESS.md) - Quick start (5 min)
+- [PROXY_REFACTOR_SUMMARY.md](PROXY_REFACTOR_SUMMARY.md) - Résumé technique
+
+## Migration Elasticsearch
+
+### Script de migration
+
+Le projet inclut un script complet de migration Elasticsearch/Kibana (`scripts/migrate_elasticsearch.py`) permettant de:
+
+- ✅ Exporter/Importer les index Elasticsearch (mapping + documents)
+- ✅ Exporter/Importer les dataviews (index patterns) Kibana
+- ✅ Exporter/Importer les dashboards et visualisations Kibana
+- ✅ Backup/Restore complets avec timestamp
+
+### Cas d'usage
+
+**1. Sauvegarde quotidienne automatisée** :
+```bash
+# Export complet
+python scripts/migrate_elasticsearch.py export --output ./backup
+
+# Structure créée
+backup_20250121_153000/
+├── indexes/           # Index ES avec documents (NDJSON)
+├── dataviews/         # Index patterns Kibana
+├── dashboards/        # Dashboards + visualizations
+└── migration_stats.json
+```
+
+**2. Migration local → production** :
+```bash
+# Export depuis local
+python scripts/migrate_elasticsearch.py export \
+  --output ./backup \
+  --es-host localhost:9200
+
+# Import vers production
+python scripts/migrate_elasticsearch.py import \
+  --input ./backup/backup_20250121_153000 \
+  --es-host production:9200 \
+  --username elastic \
+  --password changeme
+```
+
+**3. Restauration après incident** :
+```bash
+# Import depuis le dernier backup
+python scripts/migrate_elasticsearch.py import \
+  --input /data/backups/elasticsearch/backup_20250121_020000
+```
+
+### Architecture technique
+
+**APIs utilisées** :
+
+| Opération | API |
+|-----------|-----|
+| Récupérer documents | Scroll API (batch 1000) |
+| Bulk insert | Bulk API (batch 1000) |
+| Dataviews | Kibana Saved Objects API |
+| Dashboards | Kibana Saved Objects API |
+
+**Format NDJSON** (Newline Delimited JSON) :
+```json
+{"index":{"_index":"ml-api-logs","_id":"doc-1"}}
+{"timestamp":"2025-01-21T15:30:00Z","level":"INFO","message":"..."}
+{"index":{"_index":"ml-api-logs","_id":"doc-2"}}
+{"timestamp":"2025-01-21T15:31:00Z","level":"ERROR","message":"..."}
+```
+
+Documentation complète : [ELASTIC.md](ELASTIC.md)
 
 ## Flux de données
 
@@ -746,49 +941,106 @@ Documentation complète : [MAKEFILE_GUIDE.md](MAKEFILE_GUIDE.md)
 
 **Développement** :
 ```bash
-make dev              # Setup complet
-make run-api          # Lancer API
-make run-ui           # Lancer Gradio
+make dev                # Setup complet
+make run-api            # Lancer API (port 8000)
+make run-ui             # Lancer Gradio simple (port 7860)
+make run-ui-fastapi     # Lancer FastAPI+Gradio hybride (port 7860)
 ```
 
 **Tests** :
 ```bash
-make test             # Tous les tests
-make test-coverage    # Avec couverture
-make lint             # Vérifier le code
+make test               # Tous les tests
+make test-coverage      # Avec couverture (80% minimum)
+make test-api           # Tests API uniquement
+make lint               # Vérifier le code (flake8)
 ```
 
 **Docker** :
 ```bash
-make docker-build     # Construire images
-make docker-up        # Lancer conteneurs
-make docker-down      # Arrêter conteneurs
+make docker-build       # Construire images
+make docker-up          # Lancer conteneurs
+make docker-down        # Arrêter conteneurs
+make docker-logs        # Voir logs conteneurs
 ```
 
-**Pipeline** :
+**Pipeline Elasticsearch** :
 ```bash
 make pipeline-elasticsearch-up    # Lancer ES + Kibana
 make pipeline-once               # Exécuter pipeline une fois
-make pipeline-continuous         # Pipeline continu
+make pipeline-continuous         # Pipeline continu (loop)
+make pipeline-clear-indexes      # Vider les 4 index ES
+```
+
+**Migration Elasticsearch** :
+```bash
+# Export complet
+python scripts/migrate_elasticsearch.py export --output ./backup
+
+# Import complet
+python scripts/migrate_elasticsearch.py import --input ./backup/backup_YYYYMMDD_HHMMSS
+
+# Export seulement les index
+python scripts/migrate_elasticsearch.py export-indexes --output ./backup
+
+# Avec authentification
+python scripts/migrate_elasticsearch.py export \
+  --output ./backup \
+  --username elastic \
+  --password changeme
 ```
 
 **Logs** :
 ```bash
-make logs             # Afficher logs Redis
-make clear-logs       # Vider cache Redis
+make logs               # Afficher logs Redis
+make clear-logs         # Vider cache Redis
+```
+
+**Simulateur de charge** :
+```bash
+make simulate           # Simulation standard (100 requêtes)
+make simulate-quick     # Simulation rapide (10 requêtes)
+make simulate-load      # Test de charge (1000 requêtes)
+make simulate-drift     # Simulation avec drift de données
 ```
 
 ## Références
 
+### Documentation générale
 - [README.md](../README.md) - Documentation principale
 - [CLAUDE.md](../CLAUDE.md) - Règles de développement
+- [MAKEFILE_GUIDE.md](MAKEFILE_GUIDE.md) - Guide Makefile complet
+
+### API et déploiement
 - [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Documentation API complète
+- [DIRECT_HTTP_ACCESS.md](DIRECT_HTTP_ACCESS.md) - Accès HTTP sur HuggingFace Spaces (550 lignes)
+- [QUICK_START_HTTP_ACCESS.md](QUICK_START_HTTP_ACCESS.md) - Quick start HTTP (5 min)
+- [PROXY_REFACTOR_SUMMARY.md](PROXY_REFACTOR_SUMMARY.md) - Résumé technique du proxy
+
+### Logs et monitoring
+- [src/logs_pipeline/README.md](../src/logs_pipeline/README.md) - Pipeline de logs (quadruple indexation)
 - [PERFORMANCE_METRICS.md](PERFORMANCE_METRICS.md) - Métriques de performance
-- [FEATURE_ENGINEERING.md](FEATURE_ENGINEERING.md) - Features du modèle
-- [src/logs_pipeline/README.md](../src/logs_pipeline/README.md) - Pipeline de logs
+- [ELASTIC.md](ELASTIC.md) - Migration Elasticsearch/Kibana
+
+### Modèle ML
+- [FEATURE_ENGINEERING.md](FEATURE_ENGINEERING.md) - Features du modèle (28 features)
 
 ---
 
-**Version** : 1.0.0
-**Dernière mise à jour** : 20 novembre 2024
+**Version** : 2.0.0
+**Dernière mise à jour** : 21 janvier 2025
 **Projet** : OpenClassrooms MLOps - Projet 8
+
+### Changelog
+
+**Version 2.0.0** (21 janvier 2025):
+- ✅ Ajout architecture hybride FastAPI+Gradio pour HuggingFace Spaces
+- ✅ Ajout accès HTTP/REST direct sans client Gradio
+- ✅ Ajout script de migration Elasticsearch/Kibana
+- ✅ Ajout 4ème index Elasticsearch (ml-api-top-func)
+- ✅ Mise à jour diagrammes d'architecture
+- ✅ Ajout commandes Makefile (run-ui-fastapi, pipeline-clear-indexes)
+
+**Version 1.0.0** (20 novembre 2024):
+- Architecture initiale avec 3 composants (API, UI, Pipeline)
+- Triple indexation Elasticsearch
+- Monitoring de performance avec cProfile

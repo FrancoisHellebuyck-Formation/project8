@@ -1,0 +1,12 @@
+# JMeter results and reports
+results_*/
+*.jtl
+*.log
+
+# JMeter backup files
+*.jmx~
+
+# System files
+.DS_Store
+Thumbs.db
+user.properties

@@ -18,10 +18,20 @@
 
 Le package `proxy` permet de créer une passerelle entre Gradio (port 7860) et FastAPI (port 8000). Il expose tous les endpoints de l'API FastAPI via une interface Gradio interactive et conviviale.
 
+### Deux modes de déploiement
+
+#### Mode 1: Proxy Gradio standalone (développement local)
+Architecture classique avec Gradio qui communique avec l'API FastAPI sur des ports séparés.
+
+#### Mode 2: FastAPI+Gradio hybride (HuggingFace Spaces) 🆕
+Architecture innovante où FastAPI et Gradio sont montés dans la même application, permettant **l'accès HTTP/REST direct sans client Gradio**.
+
 ### Fonctionnalités principales
 
 ✅ **Client proxy complet** : Accès à tous les endpoints de l'API FastAPI
 ✅ **Interface Gradio interactive** : UI complète pour tous les endpoints
+✅ **🆕 Architecture hybride** : FastAPI + Gradio dans une seule app (HF Spaces)
+✅ **🆕 Accès HTTP direct** : Endpoints REST accessibles via curl/HTTP (HF Spaces)
 ✅ **Gestion des erreurs** : Gestion uniforme des erreurs et timeouts
 ✅ **Support batch** : Prédictions en batch pour plusieurs patients
 ✅ **Tests unitaires** : Suite de tests complète avec mocks
@@ -36,14 +46,21 @@ Le package `proxy` permet de créer une passerelle entre Gradio (port 7860) et F
 ```
 src/proxy/
 ├── __init__.py          # Exports du package
-├── client.py            # Client proxy API
-└── gradio_app.py        # Interface Gradio
+├── client.py            # Client proxy API (APIProxyClient)
+└── gradio_app.py        # Interface Gradio standalone
+
+src/ui/
+├── __init__.py          # Exports UI
+├── app.py               # Interface Gradio classique
+├── fastapi_app.py       # 🆕 App FastAPI+Gradio hybride (HF Spaces)
+└── api_routes.py        # 🆕 Routes REST API (référence)
 
 tests/
-└── test_proxy.py        # Tests unitaires
+├── test_proxy.py        # Tests unitaires proxy
+└── test_ui.py           # Tests unitaires UI
 ```
 
-### Diagramme de flux
+### Diagramme de flux - Mode 1: Standalone
 
 ```
 ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
@@ -63,6 +80,48 @@ tests/
                             │ - get_logs()     │
                             │ - etc.           │
                             └──────────────────┘
+```
+
+### Diagramme de flux - Mode 2: Hybride (HF Spaces) 🆕
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│        HuggingFace Space (Port 7860)                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │  FastAPI (Application principale)                  │   │
+│  │                                                      │   │
+│  │  Endpoints REST API (/api/*)                       │   │
+│  │  ├── GET  /api/health                              │   │
+│  │  ├── POST /api/predict                             │   │
+│  │  ├── POST /api/predict_proba                       │   │
+│  │  ├── GET  /api/logs                                │   │
+│  │  └── DELETE /api/logs                              │   │
+│  │                                                      │   │
+│  └────────────────────────────────────────────────────┘   │
+│                       ↑                                     │
+│                       │ gr.mount_gradio_app()               │
+│                       ↓                                     │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │  Gradio UI (Interface montée sur /)               │   │
+│  │  - Formulaire de prédiction                        │   │
+│  │  - Affichage résultats                             │   │
+│  └────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+        ┌─────────────────────┴─────────────────────┐
+        │                                           │
+        ↓                                           ↓
+┌──────────────┐                           ┌──────────────┐
+│ Utilisateur  │                           │ curl/HTTP    │
+│ (Interface)  │                           │ (REST API)   │
+└──────────────┘                           └──────────────┘
+                              ↓
+                    APIProxyClient
+                              ↓
+                   API FastAPI (port 8000)
 ```
 
 ---
@@ -133,6 +192,71 @@ Une fois lancé, l'interface est accessible à :
 - **Local** : http://localhost:7860
 - **Réseau local** : http://0.0.0.0:7860
 - **Public** (si share=True) : URL Gradio temporaire
+
+### 3. Mode hybride FastAPI+Gradio (HuggingFace Spaces) 🆕
+
+#### Lancer l'application hybride localement
+
+```bash
+# Méthode 1: Makefile
+make run-ui-fastapi
+
+# Méthode 2: Python
+python -m src.ui.fastapi_app
+
+# Méthode 3: Script Python
+from src.ui.fastapi_app import app
+import uvicorn
+uvicorn.run(app, host="0.0.0.0", port=7860)
+```
+
+#### Accès dual (Interface + API REST)
+
+Une fois lancé, vous avez accès à:
+
+**Interface Gradio** : http://localhost:7860/
+```bash
+# Ouvrir dans le navigateur
+open http://localhost:7860/
+```
+
+**API REST** : http://localhost:7860/api/*
+```bash
+# Health check
+curl http://localhost:7860/api/health
+
+# Prédiction
+curl -X POST http://localhost:7860/api/predict \
+  -H "Content-Type: application/json" \
+  -d '{"AGE": 65, "GENDER": 1, "SMOKING": 1, ...}'
+```
+
+#### Déploiement sur HuggingFace Spaces
+
+Le mode hybride est automatiquement utilisé lors du déploiement sur HuggingFace Spaces:
+
+```bash
+# Le Dockerfile.hf utilise automatiquement fastapi_app
+python -m src.ui.fastapi_app
+```
+
+**URL du Space** : https://francoisformation-oc-project8.hf.space
+
+**Accès direct via HTTP** :
+```bash
+# Health check
+curl https://francoisformation-oc-project8.hf.space/api/health
+
+# Prédiction
+curl -X POST https://francoisformation-oc-project8.hf.space/api/predict \
+  -H "Content-Type: application/json" \
+  -d @patient_data.json
+```
+
+Documentation complète:
+- [DIRECT_HTTP_ACCESS.md](DIRECT_HTTP_ACCESS.md) - Guide complet HTTP
+- [QUICK_START_HTTP_ACCESS.md](QUICK_START_HTTP_ACCESS.md) - Quick start (5 min)
+- [PROXY_REFACTOR_SUMMARY.md](PROXY_REFACTOR_SUMMARY.md) - Résumé technique
 
 ---
 
@@ -655,8 +779,14 @@ python cli.py clear-logs
 
 ### Documentation associée
 
+#### Proxy et déploiement
+- [DIRECT_HTTP_ACCESS.md](DIRECT_HTTP_ACCESS.md) - 🆕 Accès HTTP direct (HF Spaces)
+- [QUICK_START_HTTP_ACCESS.md](QUICK_START_HTTP_ACCESS.md) - 🆕 Quick start HTTP (5 min)
+- [PROXY_REFACTOR_SUMMARY.md](PROXY_REFACTOR_SUMMARY.md) - 🆕 Résumé technique
+
+#### Architecture
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Architecture technique complète
 - [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Documentation complète de l'API
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Architecture du projet
 - [MAKEFILE_GUIDE.md](MAKEFILE_GUIDE.md) - Guide du Makefile
 
 ### Liens utiles
@@ -664,20 +794,42 @@ python cli.py clear-logs
 - **Gradio** : https://gradio.app/docs/
 - **Requests** : https://requests.readthedocs.io/
 - **FastAPI** : https://fastapi.tiangolo.com/
+- **HuggingFace Spaces** : https://huggingface.co/docs/hub/spaces
 
 ---
 
-## 🔄 Évolutions futures
+## 🔄 Évolutions
 
-Fonctionnalités planifiées :
+### Version 2.0.0 (2025-01-21) - Implémenté ✅
+
+- ✅ **Architecture hybride FastAPI+Gradio** : Application unique pour HuggingFace Spaces
+- ✅ **Accès HTTP/REST direct** : Endpoints `/api/*` accessibles via curl/HTTP
+- ✅ **Documentation complète** : 3 guides (complet, quick start, résumé technique)
+- ✅ **Déploiement HF Spaces** : Compatible avec limitations HF (pas d'accès direct port 8000)
+- ✅ **Mode dual** : Interface UI + API REST dans la même application
+
+### Version 1.0.0 (2024-11-20) - Implémenté ✅
+
+- ✅ Client proxy complet (`APIProxyClient`)
+- ✅ Interface Gradio interactive
+- ✅ Gestion des erreurs et timeouts
+- ✅ Support batch predictions
+- ✅ Tests unitaires (~95% couverture)
+- ✅ Type hints complets
+
+### Évolutions futures planifiées
+
+Fonctionnalités à venir :
 
 - [ ] Support WebSocket pour les logs en temps réel
-- [ ] Authentification et tokens JWT
+- [ ] Authentification et tokens JWT pour les endpoints `/api/*`
 - [ ] Cache côté client pour les réponses fréquentes
 - [ ] Support multi-API (plusieurs backends FastAPI)
-- [ ] Interface CLI intégrée
-- [ ] Métriques et observabilité (Prometheus)
-- [ ] Support de requêtes asynchrones (aiohttp)
+- [ ] Interface CLI intégrée avec commandes dédiées
+- [ ] Métriques et observabilité (Prometheus/Grafana)
+- [ ] Support de requêtes asynchrones (aiohttp pour meilleures performances)
+- [ ] Rate limiting pour éviter les abus sur HF Spaces
+- [ ] OpenAPI/Swagger UI intégré sur `/docs`
 
 ---
 
@@ -700,4 +852,34 @@ Pour contribuer :
 
 ---
 
-**Dernière mise à jour** : 2025-01-21
+## 📚 Documentation associée
+
+### Architecture et déploiement
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Architecture technique complète
+- [DIRECT_HTTP_ACCESS.md](DIRECT_HTTP_ACCESS.md) - Accès HTTP sur HuggingFace Spaces (guide complet)
+- [QUICK_START_HTTP_ACCESS.md](QUICK_START_HTTP_ACCESS.md) - Quick start HTTP (5 minutes)
+- [PROXY_REFACTOR_SUMMARY.md](PROXY_REFACTOR_SUMMARY.md) - Résumé technique du refactoring
+
+### API et tests
+- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Documentation complète de l'API
+- [MAKEFILE_GUIDE.md](MAKEFILE_GUIDE.md) - Guide des commandes Makefile
+
+---
+
+**Version** : 2.0.0
+**Dernière mise à jour** : 21 janvier 2025
+**Projet** : OpenClassrooms MLOps - Projet 8
+
+### Changelog
+
+**Version 2.0.0** (21 janvier 2025):
+- ✅ Architecture hybride FastAPI+Gradio pour HuggingFace Spaces
+- ✅ Accès HTTP/REST direct sans client Gradio (`/api/*`)
+- ✅ Documentation complète en 3 niveaux
+- ✅ Mise à jour diagrammes d'architecture
+- ✅ Ajout commande `make run-ui-fastapi`
+
+**Version 1.0.0** (20 novembre 2024):
+- Client proxy initial (`APIProxyClient`)
+- Interface Gradio standalone
+- Tests unitaires complets
