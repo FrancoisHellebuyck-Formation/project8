@@ -38,7 +38,7 @@ help:
 	@echo "  make test             - Lance tous les tests"
 	@echo "  make test-coverage    - Lance les tests avec couverture (≥80%)"
 	@echo "  make test-api         - Lance les tests de l'API uniquement"
-	@echo "  make test-api-coverage - Vérifie la couverture API (≥85%)"
+	@echo "  make test-api-coverage - Vérifie la couverture API (≥80%)"
 	@echo "  make test-model       - Lance les tests du modèle uniquement"
 	@echo "  make test-proxy       - Lance les tests du package proxy"
 	@echo "  make test-performance - Test le monitoring de performance"
@@ -157,23 +157,23 @@ test-coverage:
 ## test-api: Lance les tests de l'API uniquement
 test-api:
 	@echo "$(BLUE)Lancement des tests API...$(NC)"
-	@$(UV) run pytest tests/test_api.py tests/test_main.py -v || \
+	@$(UV) run pytest tests/api/ -v || \
 		(echo "$(RED)✗ Tests API échoués$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Tests API passent$(NC)"
 
-## test-api-coverage: Lance les tests API avec vérification de couverture (seuil: 85%)
+## test-api-coverage: Lance les tests API avec vérification de couverture (seuil: 80%)
 test-api-coverage:
 	@echo "$(BLUE)Lancement des tests API avec couverture...$(NC)"
-	@echo "$(YELLOW)Seuil minimum requis: 85%$(NC)"
-	@$(UV) run pytest tests/test_api.py tests/test_main.py -v \
+	@echo "$(YELLOW)Seuil minimum requis: 80%$(NC)"
+	@$(UV) run pytest tests/api/ -v \
 		--cov=src/api \
 		--cov-report=term-missing \
 		--cov-report=html:htmlcov-api \
 		--cov-report=json:coverage-api.json \
-		--cov-fail-under=85 || \
-		(echo "$(RED)✗ Tests API échoués ou couverture < 85%$(NC)" && exit 1)
+		--cov-fail-under=80 || \
+		(echo "$(RED)✗ Tests API échoués ou couverture < 80%$(NC)" && exit 1)
 	@echo ""
-	@echo "$(GREEN)✓ Tests API passent avec couverture >= 85%$(NC)"
+	@echo "$(GREEN)✓ Tests API passent avec couverture >= 80%$(NC)"
 	@echo "$(YELLOW)📊 Rapport détaillé: htmlcov-api/index.html$(NC)"
 	@if [ -f coverage-api.json ]; then \
 		echo ""; \

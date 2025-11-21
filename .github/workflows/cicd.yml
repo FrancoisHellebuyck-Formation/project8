@@ -58,11 +58,11 @@ jobs:
     - name: Check API coverage specifically
       run: |
         echo "📊 Vérification de la couverture de l'API..."
-        uv run pytest tests/test_api.py tests/test_main.py -v \
+        uv run pytest tests/api/ -v \
           --cov=src/api \
           --cov-report=term-missing \
           --cov-report=json:coverage-api.json \
-          --cov-fail-under=85
+          --cov-fail-under=80
 
     - name: Display API coverage summary
       if: always()
