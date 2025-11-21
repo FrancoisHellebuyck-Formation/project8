@@ -651,7 +651,7 @@ def launch_ui(
     server_name: str = None, server_port: int = None, share: bool = False
 ) -> None:
     """
-    Lance l'interface Gradio.
+    Lance l'interface Gradio avec API REST montée.
 
     Args:
         server_name: Nom du serveur (par défaut: settings.GRADIO_HOST)
@@ -659,6 +659,19 @@ def launch_ui(
         share: Créer un lien public partageable (défaut: False)
     """
     interface = create_interface()
+
+    # Monter les routes FastAPI AVANT le lancement
+    # Gradio expose son app FastAPI via interface.app
+    try:
+        from .api_routes import api_router
+        # Gradio crée automatiquement une instance FastAPI
+        # On peut y inclure nos routes
+        interface.app.include_router(api_router)
+        logger.info("✅ Routes FastAPI montées pour accès HTTP/curl direct")
+    except Exception as e:
+        logger.warning(
+            f"⚠️  Impossible de monter les routes API: {e}"
+        )
 
     host = server_name or settings.GRADIO_HOST
     port = server_port or settings.GRADIO_PORT
@@ -669,13 +682,21 @@ def launch_ui(
     print("   ✅ Interface de prédiction interactive")
     print("   ✅ Section API Endpoints (testez l'API directement)")
     print("   ✅ Health check, prédictions JSON, logs")
-    print("\n📍 API Gradio (pour intégration programmatique):")
+    print("\n📍 API REST (accès HTTP/curl direct):")
+    print("   - GET  /api/health")
+    print("   - POST /api/predict")
+    print("   - POST /api/predict_proba")
+    print("   - GET  /api/logs?limit=100&offset=0")
+    print("   - DELETE /api/logs")
+    print("\n📍 API Gradio (intégration programmatique):")
     print("   - /api/health")
     print("   - /api/predict_api")
     print("   - /api/predict_proba_api")
     print("   - /api/logs_api")
     print(f"\n💡 Interface web: http://{host}:{port}")
     print("💡 Documentation: Voir section 'API Endpoints' dans l'interface")
+    print("\n🔧 Test curl:")
+    print(f"   curl http://{host}:{port}/api/health")
 
     interface.launch(server_name=host, server_port=port, share=share)
 

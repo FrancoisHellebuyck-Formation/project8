@@ -81,8 +81,10 @@ RUN echo '#!/bin/bash\n\
   sleep 2\n\
   done\n\
   \n\
-  echo "🎨 Démarrage de l'\''UI Gradio sur le port 7860..."\n\
-  python -m src.ui\n\
+  echo "🎨 Démarrage de l'\''UI FastAPI+Gradio sur le port 7860..."\n\
+  echo "📍 Interface UI: http://localhost:7860/"\n\
+  echo "📍 API REST: http://localhost:7860/api/*"\n\
+  python -m src.ui.fastapi_app\n\
   ' > /app/start.sh && chmod +x /app/start.sh
 
 # Changer les permissions
