@@ -48,6 +48,7 @@ class ElasticsearchIndexer:
         self.index = index or config.elasticsearch_index
         self.message_index = "ml-api-message"  # Index pour messages parsés
         self.perf_index = "ml-api-perfs"  # Index pour métriques de performance  # noqa: E501
+        self.top_func_index = "ml-api-top-func"  # Index pour top functions dénormalisées  # noqa: E501
         self.client: Optional[Elasticsearch] = None
 
     def connect(self) -> bool:
@@ -196,6 +197,29 @@ class ElasticsearchIndexer:
                 logger.info(
                     f"Index '{self.perf_index}' créé avec succès"
                 )
+
+            # Index pour les top functions dénormalisées
+            if not self.client.indices.exists(index=self.top_func_index):
+                top_func_mapping = {
+                    "mappings": {
+                        "properties": {
+                            "@timestamp": {"type": "date"},
+                            "transaction_id": {"type": "keyword"},
+                            "function": {"type": "keyword"},
+                            "file": {"type": "keyword"},
+                            "line": {"type": "integer"},
+                            "cumulative_time_ms": {"type": "float"},
+                            "total_time_ms": {"type": "float"},
+                            "calls": {"type": "integer"}
+                        }
+                    }
+                }
+                self.client.indices.create(
+                    index=self.top_func_index, body=top_func_mapping
+                )
+                logger.info(
+                    f"Index '{self.top_func_index}' créé avec succès"
+                )
         except Exception as e:
             logger.error(f"Erreur lors de la création des index: {e}")
 
@@ -269,6 +293,51 @@ class ElasticsearchIndexer:
 
         return None
 
+    def _extract_top_functions(self, doc: Dict) -> List[Dict]:
+        """
+        Extrait et dénormalise les top_functions d'un document.
+
+        Args:
+            doc: Document source complet
+
+        Returns:
+            List[Dict]: Liste de documents de fonctions avec transaction_id
+        """
+        import json
+
+        # Chercher "performance_metrics" dans le message
+        message = doc.get('message', '')
+
+        # Essayer de parser le message comme JSON
+        try:
+            parsed = json.loads(message)
+            if 'performance_metrics' in parsed:
+                perf_metrics = parsed['performance_metrics']
+                top_functions = perf_metrics.get('top_functions', [])
+                transaction_id = perf_metrics.get('transaction_id')
+                timestamp = doc.get('@timestamp')
+
+                # Dénormaliser: créer un document par fonction
+                func_docs = []
+                for func in top_functions:
+                    func_doc = {
+                        '@timestamp': timestamp,
+                        'transaction_id': transaction_id,
+                        'function': func.get('function'),
+                        'file': func.get('file'),
+                        'line': func.get('line'),
+                        'cumulative_time_ms': func.get('cumulative_time_ms'),
+                        'total_time_ms': func.get('total_time_ms'),
+                        'calls': func.get('calls')
+                    }
+                    func_docs.append(func_doc)
+
+                return func_docs
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        return []
+
     def index_documents(
         self,
         all_documents: List[Dict],
@@ -329,6 +398,15 @@ class ElasticsearchIndexer:
                         "_source": perf_doc
                     })
 
+            # 4. Documents FILTRÉS avec top_functions dénormalisées
+            for doc in filtered_documents:
+                func_docs = self._extract_top_functions(doc)
+                for func_doc in func_docs:
+                    actions.append({
+                        "_index": self.top_func_index,
+                        "_source": func_doc
+                    })
+
             # Indexer en masse
             success, errors = bulk(
                 self.client,
@@ -354,11 +432,16 @@ class ElasticsearchIndexer:
                 perf_count = len(
                     [d for d in filtered_documents if self._extract_perf_data(d)]  # noqa: E501
                 )
+                func_count = sum(
+                    len(self._extract_top_functions(d))
+                    for d in filtered_documents
+                )
                 logger.info(
                     f"Indexation: {success} documents indexés avec succès "
                     f"({len(all_documents)} logs bruts, "
                     f"{message_count} messages parsés, "
-                    f"{perf_count} métriques de performance)"
+                    f"{perf_count} métriques de performance, "
+                    f"{func_count} top functions)"
                 )
 
             return success

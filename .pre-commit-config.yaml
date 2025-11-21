@@ -1,0 +1,56 @@
+# Configuration pre-commit pour Project8
+# Installation: pip install pre-commit && pre-commit install
+# Usage manuel: pre-commit run --all-files
+
+repos:
+  # Hooks Python standards
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(.*\.md|.*\.txt)$
+      - id: end-of-file-fixer
+        exclude: ^(.*\.md|.*\.txt)$
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=5000']
+      - id: check-merge-conflict
+      - id: debug-statements
+
+  # Formatage avec black (optionnel, commenté par défaut)
+  # - repo: https://github.com/psf/black
+  #   rev: 24.1.1
+  #   hooks:
+  #     - id: black
+  #       language_version: python3.13
+  #       args: ['--line-length=88']
+
+  # Linting avec flake8
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: ['--config=.flake8']
+        exclude: ^(tests/|\.venv/|\.jupyter/)
+
+  # Vérification de la couverture API (hook personnalisé)
+  - repo: local
+    hooks:
+      - id: check-api-coverage
+        name: Vérifier la couverture de l'API
+        entry: python3 scripts/check_api_coverage.py --min-coverage 85
+        language: system
+        pass_filenames: false
+        files: ^(src/api/.*\.py|tests/test_(api|main)\.py)$
+        stages: [commit]
+        verbose: true
+
+      - id: check-tests-pass
+        name: Vérifier que tous les tests passent
+        entry: make test
+        language: system
+        pass_filenames: false
+        files: ^(src/.*\.py|tests/.*\.py)$
+        stages: [push]
+        verbose: true

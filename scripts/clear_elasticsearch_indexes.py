@@ -54,6 +54,7 @@ def main():
         indexer.index,           # ml-api-logs
         indexer.message_index,   # ml-api-message
         indexer.perf_index,      # ml-api-perfs
+        indexer.top_func_index,  # ml-api-top-func
     ]
 
     logger.info("\n" + "=" * 60)

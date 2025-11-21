@@ -88,3 +88,14 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+# Seuil minimum de couverture globale
+fail_under = 80
+show_missing = true
+precision = 2
+
+# Configuration spécifique pour l'API (via pytest --cov=src/api)
+[tool.coverage.paths]
+source = [
+    "src/",
+    "*/src/",
+]

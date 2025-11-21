@@ -26,10 +26,11 @@ Filtre les logs selon un pattern défini :
 - Vérifie le message, le path HTTP et la méthode
 
 ### 4. `indexer.py` - Indexeur Elasticsearch
-Indexe les logs dans Elasticsearch avec une triple indexation :
+Indexe les logs dans Elasticsearch avec une quadruple indexation :
 - **Index `ml-api-logs`** : **TOUS les logs bruts sans filtrage** (complets avec tous les champs)
 - **Index `ml-api-message`** : Messages parsés **filtrés** avec uniquement les données structurées (input_data, result)
 - **Index `ml-api-perfs`** : Métriques de performance **filtrés** (transaction_id, temps d'inférence, CPU, mémoire, etc.)
+- **Index `ml-api-top-func`** : Top functions dénormalisées **filtrés** (une ligne par fonction avec transaction_id parent)
 - Création automatique des index avec mapping adapté
 - Indexation en masse (bulk insert)
 - Gestion de la connexion
@@ -162,7 +163,7 @@ pipeline.run_continuous(limit=100, poll_interval=10)
 
 ## Structure des index Elasticsearch
 
-Le pipeline crée automatiquement trois index distincts :
+Le pipeline crée automatiquement quatre index distincts :
 
 ### 1. Index `ml-api-logs` - Logs bruts complets (NON FILTRÉS)
 
@@ -211,19 +212,33 @@ Contient uniquement les métriques de performance **filtrées** :
 - `latency_ms` : Latence totale en ms
 - `top_functions` : Liste des fonctions les plus coûteuses (nested)
 
-**Avantages de la triple indexation :**
+### 4. Index `ml-api-top-func` - Top functions dénormalisées (FILTRÉS)
+
+Contient les fonctions les plus coûteuses **dénormalisées** (une ligne par fonction) :
+- `@timestamp` : Date/heure du log
+- `transaction_id` : ID unique de la transaction parent
+- `function` : Nom de la fonction
+- `file` : Fichier source
+- `line` : Numéro de ligne
+- `cumulative_time_ms` : Temps cumulé en ms
+- `total_time_ms` : Temps total en ms
+- `calls` : Nombre d'appels
+
+**Avantages de la quadruple indexation :**
 - `ml-api-logs` : **TOUS les logs** pour le débogage complet et l'audit (aucun filtrage)
 - `ml-api-message` : Logs **filtrés** pour l'analyse des prédictions et du drift de données
 - `ml-api-perfs` : Logs **filtrés** pour l'analyse des performances et l'optimisation du modèle
+- `ml-api-top-func` : Fonctions **dénormalisées** pour identifier rapidement les goulots d'étranglement
 
 ## Visualisation avec Kibana
 
 1. Ouvrir Kibana : http://localhost:5601
 2. Aller dans "Stack Management" > "Index Patterns"
-3. Créer trois index patterns :
+3. Créer quatre index patterns :
    - `ml-api-logs*` pour les logs complets
    - `ml-api-message*` pour les messages parsés uniquement
    - `ml-api-perfs*` pour les métriques de performance
+   - `ml-api-top-func*` pour les top functions dénormalisées
 4. Aller dans "Discover" pour visualiser les logs
 
 ### Tester la création des index
@@ -232,7 +247,7 @@ Contient uniquement les métriques de performance **filtrées** :
 make pipeline-test-indexes
 ```
 
-Cette commande vérifie que les trois index sont créés avec les bons mappings.
+Cette commande vérifie que les quatre index sont créés avec les bons mappings.
 
 ### Vider les index Elasticsearch
 
@@ -242,7 +257,7 @@ Pour supprimer tous les logs indexés et repartir de zéro :
 make pipeline-clear-indexes
 ```
 
-Cette commande supprime les index `ml-api-logs`, `ml-api-message` et `ml-api-perfs`. Les index seront automatiquement recréés au prochain lancement du pipeline.
+Cette commande supprime les index `ml-api-logs`, `ml-api-message`, `ml-api-perfs` et `ml-api-top-func`. Les index seront automatiquement recréés au prochain lancement du pipeline.
 
 ⚠️ **Attention** : Cette action est irréversible. Tous les logs indexés seront définitivement supprimés.
 

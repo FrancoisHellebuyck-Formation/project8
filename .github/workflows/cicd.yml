@@ -45,6 +45,48 @@ jobs:
       run: |
         uv run pytest tests/ --cov=src --cov-report=xml --cov-report=html --cov-report=term-missing --cov-fail-under=80 -v
 
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Check API coverage specifically
+      run: |
+        echo "📊 Vérification de la couverture de l'API..."
+        uv run pytest tests/test_api.py tests/test_main.py -v \
+          --cov=src/api \
+          --cov-report=term-missing \
+          --cov-report=json:coverage-api.json \
+          --cov-fail-under=85
+
+    - name: Display API coverage summary
+      if: always()
+      run: |
+        if [ -f coverage-api.json ]; then
+          echo "==================================================="
+          echo "📈 Résumé de la couverture de l'API"
+          echo "==================================================="
+          python -c "
+          import json
+          with open('coverage-api.json') as f:
+              data = json.load(f)
+          total = data['totals']['percent_covered']
+          print(f'Couverture totale API: {total:.2f}%')
+          print('')
+          print('Détail par fichier:')
+          for file, stats in data['files'].items():
+              if 'src/api' in file:
+                  pct = stats['summary']['percent_covered']
+                  print(f'  {file}: {pct:.2f}%')
+          "
+          echo "==================================================="
+        fi
+
   lint:
     runs-on: ubuntu-latest
     steps:
