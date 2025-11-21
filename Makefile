@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs clear-logs logs-gradio-local logs-gradio-hf health predict-test pipeline-check pipeline-once pipeline-continuous pipeline-elasticsearch-up pipeline-elasticsearch-down simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-ui-fastapi run-redis stop-redis docker-build docker-up docker-down docker-logs logs clear-logs logs-gradio-local logs-gradio-hf health predict-test pipeline-check pipeline-once pipeline-continuous pipeline-elasticsearch-up pipeline-elasticsearch-down simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze
 
 # Variables
 PYTHON := python
@@ -46,8 +46,9 @@ help:
 	@echo "  make test-gradio-api-hf     - Test l'API Gradio (HuggingFace)"
 	@echo ""
 	@echo "$(GREEN)Développement:$(NC)"
-	@echo "  make run-api          - Lance l'API FastAPI"
-	@echo "  make run-ui           - Lance l'interface Gradio"
+	@echo "  make run-api          - Lance l'API FastAPI (port 8000)"
+	@echo "  make run-ui           - Lance l'interface Gradio simple (port 7860)"
+	@echo "  make run-ui-fastapi   - Lance FastAPI+Gradio hybride (port 7860, avec /api/*)"
 	@echo "  make run-proxy        - Lance l'interface proxy (tous endpoints)"
 	@echo "  make run-redis        - Lance Redis avec Docker"
 	@echo "  make stop-redis       - Arrête le conteneur Redis"
@@ -255,11 +256,24 @@ test-proxy:
 		(echo "$(RED)✗ Tests proxy échoués$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Tests proxy passent$(NC)"
 
-## run-ui: Lance l'interface Gradio
+## run-ui: Lance l'interface Gradio simple
 run-ui:
-	@echo "$(BLUE)Démarrage de l'interface Gradio...$(NC)"
+	@echo "$(BLUE)Démarrage de l'interface Gradio simple...$(NC)"
 	@echo "$(YELLOW)Interface disponible sur http://$(GRADIO_HOST):$(GRADIO_PORT)$(NC)"
 	@$(VENV_BIN)/python -m src.ui.app
+
+## run-ui-fastapi: Lance FastAPI+Gradio hybride (avec endpoints REST /api/*)
+run-ui-fastapi:
+	@echo "$(BLUE)Démarrage de FastAPI+Gradio hybride...$(NC)"
+	@echo "$(YELLOW)Interface UI: http://$(GRADIO_HOST):$(GRADIO_PORT)/$(NC)"
+	@echo "$(YELLOW)API REST:     http://$(GRADIO_HOST):$(GRADIO_PORT)/api/*$(NC)"
+	@echo "$(GREEN)Endpoints disponibles:$(NC)"
+	@echo "  - GET  /api/health"
+	@echo "  - POST /api/predict"
+	@echo "  - POST /api/predict_proba"
+	@echo "  - GET  /api/logs"
+	@echo "  - DELETE /api/logs"
+	@$(VENV_BIN)/python -m src.ui.fastapi_app
 
 ## run-redis: Lance Redis avec Docker
 run-redis:

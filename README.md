@@ -36,7 +36,13 @@ Le projet est structuré en 3 parties principales :
 - Cases à cocher pour les paramètres binaires
 - Communique avec l'API FastAPI
 
-### 4. Package Proxy (`./src/proxy`)
+### 4. Application FastAPI+Gradio (`./src/ui/fastapi_app.py`)
+- **Architecture hybride** : FastAPI principal avec Gradio monté dessus
+- **Accès HTTP/REST direct** via `/api/*` (sans client Gradio)
+- **Interface UI** accessible via la racine `/`
+- Compatible HuggingFace Spaces pour accès curl/HTTP standard
+
+### 5. Package Proxy (`./src/proxy`)
 - Proxy complet Gradio ↔ FastAPI
 - Expose tous les endpoints de l'API via interface Gradio
 - Client Python pour utilisation programmatique
@@ -79,6 +85,14 @@ Le projet est structuré en 3 parties principales :
 - ✅ Affichage du niveau de risque
 - ✅ Gestion des erreurs
 - ✅ Communication avec l'API
+
+### FastAPI+Gradio (HuggingFace Spaces)
+- ✅ **Accès HTTP/REST direct** sans client Gradio
+- ✅ Endpoints `/api/*` accessibles via curl, requests, fetch
+- ✅ Interface Gradio montée sur la racine `/`
+- ✅ Compatible avec tous les langages (Python, JavaScript, R, etc.)
+- ✅ Documentation interactive FastAPI (`/docs`)
+- ✅ Format JSON REST standard
 
 ### Package Proxy
 - ✅ Client Python pour tous les endpoints API
@@ -154,8 +168,9 @@ make install          # Production
 make install-dev      # Développement
 
 # Développement
-make run-api          # Lancer l'API
-make run-ui           # Lancer l'interface Gradio
+make run-api          # Lancer l'API backend (port 8000)
+make run-ui           # Lancer l'interface Gradio (port 7860)
+make run-ui-fastapi   # Lancer FastAPI+Gradio hybride (port 7860)
 make run-proxy        # Lancer le proxy (tous endpoints)
 make run-redis        # Lancer Redis
 make dev             # Environnement complet
@@ -230,6 +245,65 @@ L'interface permet de :
 - Obtenir une prédiction en un clic
 - Visualiser le niveau de risque et la probabilité
 
+### Accès HTTP Direct sur HuggingFace Spaces 🚀
+
+L'application déployée sur HuggingFace Spaces expose des endpoints REST accessibles directement via HTTP (curl, requests, fetch, etc.) **sans nécessiter le client Gradio**.
+
+#### URL du Space
+```
+https://francoisformation-oc-project8.hf.space
+```
+
+#### Endpoints Disponibles
+
+**Health Check**:
+```bash
+curl https://francoisformation-oc-project8.hf.space/api/health
+```
+
+**Prédiction**:
+```bash
+curl -X POST https://francoisformation-oc-project8.hf.space/api/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "AGE": 65,
+    "GENDER": 1,
+    "SMOKING": 1,
+    "ALCOHOL CONSUMING": 1,
+    "PEER_PRESSURE": 0,
+    "YELLOW_FINGERS": 1,
+    "ANXIETY": 0,
+    "FATIGUE": 1,
+    "ALLERGY": 0,
+    "WHEEZING": 1,
+    "COUGHING": 1,
+    "SHORTNESS OF BREATH": 1,
+    "SWALLOWING DIFFICULTY": 0,
+    "CHEST PAIN": 1,
+    "CHRONIC DISEASE": 0
+  }'
+```
+
+**Logs**:
+```bash
+# Récupérer les logs
+curl "https://francoisformation-oc-project8.hf.space/api/logs?limit=10"
+
+# Vider les logs
+curl -X DELETE https://francoisformation-oc-project8.hf.space/api/logs
+```
+
+**Interface Gradio**: Accessible sur la racine `/`
+```
+https://francoisformation-oc-project8.hf.space/
+```
+
+📖 **Documentation complète**: Voir [docs/DIRECT_HTTP_ACCESS.md](docs/DIRECT_HTTP_ACCESS.md) pour:
+- Tous les endpoints disponibles
+- Exemples d'intégration (Python, JavaScript, R)
+- Codes de statut HTTP
+- Dépannage
+
 ### Documentation interactive API
 
 - **Swagger UI** : http://localhost:8000/docs
@@ -255,6 +329,9 @@ L'interface permet de :
 ### HuggingFace Spaces
 - [docs/README_HF.md](docs/README_HF.md) - README pour HuggingFace Spaces
 - [docs/SETUP_HF_TOKEN.md](docs/SETUP_HF_TOKEN.md) - Configuration du token HuggingFace
+- **[docs/QUICK_START_HTTP_ACCESS.md](docs/QUICK_START_HTTP_ACCESS.md)** - **⚡ Quick Start - Exemples curl rapides**
+- **[docs/DIRECT_HTTP_ACCESS.md](docs/DIRECT_HTTP_ACCESS.md)** - **Accès HTTP/REST complet (curl, requests, fetch)**
+- [docs/PROXY_REFACTOR_SUMMARY.md](docs/PROXY_REFACTOR_SUMMARY.md) - Résumé de la refactorisation proxy
 
 ## 🛠️ Développement
 
@@ -272,7 +349,9 @@ project8/
 │   │   ├── predictor.py
 │   │   └── feature_engineering.py
 │   ├── ui/               # Interface Gradio
-│   │   └── app.py        # Application Gradio
+│   │   ├── app.py        # Application Gradio simple
+│   │   ├── fastapi_app.py # FastAPI+Gradio (HF Spaces)
+│   │   └── api_routes.py # Routes REST API
 │   ├── proxy/            # Package proxy
 │   │   ├── client.py     # Client API
 │   │   └── gradio_app.py # Interface proxy
