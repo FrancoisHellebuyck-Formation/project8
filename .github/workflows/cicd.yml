@@ -127,7 +127,7 @@ jobs:
         cp docker/Dockerfile.hf Dockerfile
 
         echo "Copier le README pour HF Spaces avec metadata"
-        cp README_HF.md README.md
+        cp docs/README_HF.md README.md
 
         echo "Suppression des données non nécessaires en production"
         git rm -f *.pdf 2>/dev/null || true
