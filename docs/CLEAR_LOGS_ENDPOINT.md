@@ -45,7 +45,7 @@ Ou si une exception est levée:
 
 ## Exemples d'utilisation
 
-### Avec cURL
+### Avec cURL (API directe)
 
 ```bash
 curl -X DELETE "http://localhost:8000/logs"
@@ -57,6 +57,25 @@ curl -X DELETE "http://localhost:8000/logs"
   "message": "Logs supprimés avec succès"
 }
 ```
+
+### Avec Makefile (recommandé)
+
+#### API locale
+```bash
+make clear-logs
+```
+
+#### Via Gradio local
+```bash
+make clear-logs-gradio-local
+```
+
+#### Via Gradio HuggingFace Spaces
+```bash
+make clear-logs-gradio-hf
+```
+
+**Note** : Les commandes Gradio utilisent le client Gradio pour appeler l'endpoint `/api_clear_logs_proxy` qui fait un proxy vers `DELETE /logs` de l'API.
 
 ### Avec HTTPie
 

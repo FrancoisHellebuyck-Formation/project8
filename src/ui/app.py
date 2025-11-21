@@ -257,6 +257,18 @@ def api_logs_proxy(limit: int = 100, offset: int = 0):
         return {"error": str(e)}, 503
 
 
+def api_clear_logs_proxy():
+    """Proxy vers l'endpoint DELETE /logs de FastAPI."""
+    try:
+        response = requests.delete(
+            f"{settings.API_URL}/logs",
+            timeout=10
+        )
+        return response.json(), response.status_code
+    except Exception as e:
+        return {"error": str(e)}, 503
+
+
 def create_interface() -> gr.Blocks:
     """
     Crée l'interface Gradio.
@@ -566,6 +578,25 @@ def create_interface() -> gr.Blocks:
                 inputs=[logs_limit_input, logs_offset_input],
                 outputs=logs_output,
                 api_name="logs_api"
+            )
+
+            # Endpoint pour vider les logs Redis (via API proxy)
+            # Exposé uniquement via l'API, pas dans l'interface visible
+            def clear_logs_api_wrapper():
+                """Wrapper pour vider les logs Redis."""
+                result, _ = api_clear_logs_proxy()
+                return result
+
+            # Créer un bouton invisible juste pour exposer l'API
+            clear_logs_output = gr.JSON(visible=False)
+            clear_logs_btn = gr.Button(
+                "🗑️ Vider les logs Redis",
+                visible=False
+            )
+            clear_logs_btn.click(
+                fn=clear_logs_api_wrapper,
+                outputs=clear_logs_output,
+                api_name="api_clear_logs_proxy"
             )
 
     return interface

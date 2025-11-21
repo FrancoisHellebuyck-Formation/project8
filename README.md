@@ -153,9 +153,14 @@ make docker-up       # Lancer les conteneurs
 make docker-down     # Arrêter les conteneurs
 
 # Utilitaires
-make health          # Vérifier l'API
-make predict-test    # Tester une prédiction
-make logs           # Afficher les logs
+make health                   # Vérifier l'API
+make predict-test             # Tester une prédiction
+make logs                     # Afficher les logs
+
+# Gestion des logs Redis
+make clear-logs               # Vider logs (API locale)
+make clear-logs-gradio-local  # Vider logs (Gradio local)
+make clear-logs-gradio-hf     # Vider logs (Gradio HF Spaces)
 ```
 
 ### API Endpoints
@@ -192,8 +197,8 @@ curl -X POST http://localhost:8000/predict \
 # Récupérer les logs
 curl http://localhost:8000/logs?limit=50
 
-# Statistiques
-curl http://localhost:8000/logs/stats
+# Vider le cache Redis
+curl -X DELETE http://localhost:8000/logs
 ```
 
 ### Interface Gradio
@@ -219,6 +224,7 @@ L'interface permet de :
 - [README.md](README.md) - Ce fichier
 
 ### Documentation technique (dossier docs/)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Architecture technique complète et flux de données
 - [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) - Documentation complète de l'API
 - [docs/UI_DOCUMENTATION.md](docs/UI_DOCUMENTATION.md) - Documentation de l'interface Gradio
 - [docs/FEATURE_ENGINEERING.md](docs/FEATURE_ENGINEERING.md) - Feature engineering automatique

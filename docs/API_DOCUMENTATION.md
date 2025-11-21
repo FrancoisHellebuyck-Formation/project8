@@ -62,8 +62,7 @@ Retourne les informations de base de l'API.
     "health": "/health",
     "predict": "/predict",
     "predict_proba": "/predict_proba",
-    "logs": "/logs",
-    "logs/stats": "/logs/stats"
+    "logs": "/logs"
   }
 }
 ```
@@ -192,11 +191,11 @@ Effectue une prédiction avec les probabilités pour chaque classe.
 
 **Méthode** : `GET`
 
-Récupère les logs de l'API stockés dans Redis.
+Récupère les logs de l'API stockés dans Redis avec pagination.
 
 **Paramètres de requête** :
 - `limit` (optionnel) : Nombre de logs à récupérer (défaut: 100, max: 1000)
-- `level` (optionnel) : Filtrer par niveau (INFO, ERROR, WARNING, etc.)
+- `offset` (optionnel) : Nombre de logs à sauter pour la pagination (défaut: 0)
 
 **Réponse** :
 ```json
@@ -217,34 +216,19 @@ Récupère les logs de l'API stockés dans Redis.
 }
 ```
 
-**Exemple cURL** :
+**Exemples cURL** :
 ```bash
-# Récupérer les 50 derniers logs
+# Récupérer les 50 premiers logs
 curl "http://localhost:8000/logs?limit=50"
 
-# Récupérer uniquement les erreurs
-curl "http://localhost:8000/logs?level=ERROR"
+# Récupérer 50 logs en sautant les 100 premiers (pagination)
+curl "http://localhost:8000/logs?limit=50&offset=100"
+
+# Récupérer tous les logs (jusqu'à 1000)
+curl "http://localhost:8000/logs?limit=1000"
 ```
 
-### 6. Statistiques des logs - `/logs/stats`
-
-**Méthode** : `GET`
-
-Récupère des statistiques sur les logs.
-
-**Réponse** :
-```json
-{
-  "total": 150,
-  "by_level": {
-    "INFO": 120,
-    "ERROR": 20,
-    "WARNING": 10
-  }
-}
-```
-
-### 7. Supprimer les logs - `/logs`
+### 6. Supprimer les logs - `/logs`
 
 **Méthode** : `DELETE`
 

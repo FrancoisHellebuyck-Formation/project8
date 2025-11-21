@@ -279,13 +279,30 @@ logs:
 		$(PYTHON) -m json.tool || \
 		echo "$(RED)✗ Impossible de récupérer les logs$(NC)"
 
-## clear-logs: Vide le cache des logs Redis
+## clear-logs: Vide le cache des logs Redis (API locale)
 clear-logs:
 	@echo "$(BLUE)Suppression des logs du cache Redis...$(NC)"
 	@curl -X DELETE -s http://localhost:$(API_PORT)/logs | \
 		$(PYTHON) -m json.tool && \
 		echo "$(GREEN)✓ Logs supprimés avec succès$(NC)" || \
 		echo "$(RED)✗ Échec de la suppression des logs$(NC)"
+
+## clear-logs-gradio-local: Vide le cache Redis via Gradio local
+clear-logs-gradio-local:
+	@echo "$(BLUE)Suppression des logs via Gradio local...$(NC)"
+	@GRADIO_URL=http://localhost:7860 $(UV) run python3 clear_logs_gradio.py
+
+## clear-logs-gradio-hf: Vide le cache Redis via Gradio HF Spaces
+clear-logs-gradio-hf:
+	@echo "$(BLUE)Suppression des logs via Gradio HF Spaces...$(NC)"
+	@if [ -f .env ]; then \
+		echo "$(YELLOW)Chargement de HF_TOKEN depuis .env...$(NC)"; \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		GRADIO_URL=$(GRADIO_HF_URL) $(UV) run python3 clear_logs_gradio.py; \
+	else \
+		echo "$(YELLOW)⚠️  Fichier .env non trouvé, test sans token$(NC)"; \
+		GRADIO_URL=$(GRADIO_HF_URL) $(UV) run python3 clear_logs_gradio.py; \
+	fi
 
 ## logs-gradio-local: Affiche les logs via Gradio local
 logs-gradio-local:
