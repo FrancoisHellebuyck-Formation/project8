@@ -71,19 +71,19 @@ jobs:
           echo "==================================================="
           echo "📈 Résumé de la couverture de l'API"
           echo "==================================================="
-          python -c "
-          import json
-          with open('coverage-api.json') as f:
-              data = json.load(f)
-          total = data['totals']['percent_covered']
-          print(f'Couverture totale API: {total:.2f}%')
-          print('')
-          print('Détail par fichier:')
-          for file, stats in data['files'].items():
-              if 'src/api' in file:
-                  pct = stats['summary']['percent_covered']
-                  print(f'  {file}: {pct:.2f}%')
-          "
+          python3 << 'PYTHON_SCRIPT'
+        import json
+        with open('coverage-api.json') as f:
+            data = json.load(f)
+        total = data['totals']['percent_covered']
+        print(f'Couverture totale API: {total:.2f}%')
+        print('')
+        print('Détail par fichier:')
+        for file, stats in data['files'].items():
+            if 'src/api' in file:
+                pct = stats['summary']['percent_covered']
+                print(f'  {file}: {pct:.2f}%')
+        PYTHON_SCRIPT
           echo "==================================================="
         fi
 
