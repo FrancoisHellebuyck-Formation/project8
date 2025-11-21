@@ -36,8 +36,9 @@ help:
 	@echo "  make lint             - Vérifie le code avec flake8"
 	@echo "  make format           - Formate le code (placeholder)"
 	@echo "  make test             - Lance tous les tests"
-	@echo "  make test-coverage    - Lance les tests avec couverture"
+	@echo "  make test-coverage    - Lance les tests avec couverture (≥80%)"
 	@echo "  make test-api         - Lance les tests de l'API uniquement"
+	@echo "  make test-api-coverage - Vérifie la couverture API (≥85%)"
 	@echo "  make test-model       - Lance les tests du modèle uniquement"
 	@echo "  make test-proxy       - Lance les tests du package proxy"
 	@echo "  make test-performance - Test le monitoring de performance"
@@ -144,20 +145,52 @@ test:
 		(echo "$(RED)✗ Tests échoués$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Tous les tests passent$(NC)"
 
-## test-coverage: Lance les tests avec couverture
+## test-coverage: Lance les tests avec couverture (seuil global: 80%)
 test-coverage:
 	@echo "$(BLUE)Lancement des tests avec couverture...$(NC)"
 	@$(UV) run pytest tests/ --cov=src --cov-report=html \
-		--cov-report=term-missing --cov-report=xml || \
-		(echo "$(RED)✗ Tests échoués$(NC)" && exit 1)
+		--cov-report=term-missing --cov-report=xml \
+		--cov-fail-under=80 || \
+		(echo "$(RED)✗ Tests échoués ou couverture < 80%$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Rapport de couverture généré dans htmlcov/ et coverage.xml$(NC)"
 
 ## test-api: Lance les tests de l'API uniquement
 test-api:
 	@echo "$(BLUE)Lancement des tests API...$(NC)"
-	@$(UV) run pytest tests/api/ -v || \
+	@$(UV) run pytest tests/test_api.py tests/test_main.py -v || \
 		(echo "$(RED)✗ Tests API échoués$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Tests API passent$(NC)"
+
+## test-api-coverage: Lance les tests API avec vérification de couverture (seuil: 85%)
+test-api-coverage:
+	@echo "$(BLUE)Lancement des tests API avec couverture...$(NC)"
+	@echo "$(YELLOW)Seuil minimum requis: 85%$(NC)"
+	@$(UV) run pytest tests/test_api.py tests/test_main.py -v \
+		--cov=src/api \
+		--cov-report=term-missing \
+		--cov-report=html:htmlcov-api \
+		--cov-report=json:coverage-api.json \
+		--cov-fail-under=85 || \
+		(echo "$(RED)✗ Tests API échoués ou couverture < 85%$(NC)" && exit 1)
+	@echo ""
+	@echo "$(GREEN)✓ Tests API passent avec couverture >= 85%$(NC)"
+	@echo "$(YELLOW)📊 Rapport détaillé: htmlcov-api/index.html$(NC)"
+	@if [ -f coverage-api.json ]; then \
+		echo ""; \
+		echo "================================================="; \
+		echo "📈 Résumé de la couverture de l'API"; \
+		echo "================================================="; \
+		python3 -c "\
+import json; \
+data = json.load(open('coverage-api.json')); \
+total = data['totals']['percent_covered']; \
+print(f'Couverture totale API: {total:.2f}%'); \
+print(''); \
+print('Détail par fichier:'); \
+[print(f\"  {file.replace('src/api/', '')}: {stats['summary']['percent_covered']:.2f}%\") \
+ for file, stats in data['files'].items() if 'src/api' in file]"; \
+		echo "================================================="; \
+	fi
 
 ## test-model: Lance les tests du modèle uniquement
 test-model:

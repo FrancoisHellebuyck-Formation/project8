@@ -170,6 +170,7 @@ pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
+htmlcov-api/
 .tox/
 .nox/
 .coverage
@@ -177,6 +178,7 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+coverage-api.json
 *.cover
 *.py,cover
 .hypothesis/
