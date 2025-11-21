@@ -14,7 +14,7 @@ Les routes sont accessibles via:
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-from typing import Dict, Optional
+from typing import Dict
 import logging
 
 from ..proxy.client import APIProxyClient
