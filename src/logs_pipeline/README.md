@@ -22,13 +22,14 @@ Récupère les logs depuis l'API Gradio HuggingFace :
 ### 3. `filter.py` - Filtre de logs
 Filtre les logs selon un pattern défini :
 - Par défaut : `"API Call - POST /predict"`
+- Accepte aussi les logs de métriques de performance (`"performance_metrics"`)
 - Vérifie le message, le path HTTP et la méthode
 
 ### 4. `indexer.py` - Indexeur Elasticsearch
 Indexe les logs dans Elasticsearch avec une triple indexation :
-- **Index `ml-api-logs`** : Logs bruts complets avec tous les champs
-- **Index `ml-api-message`** : Messages parsés avec uniquement les données structurées (input_data, result)
-- **Index `ml-api-perfs`** : Métriques de performance (transaction_id, temps d'inférence, CPU, mémoire, etc.)
+- **Index `ml-api-logs`** : **TOUS les logs bruts sans filtrage** (complets avec tous les champs)
+- **Index `ml-api-message`** : Messages parsés **filtrés** avec uniquement les données structurées (input_data, result)
+- **Index `ml-api-perfs`** : Métriques de performance **filtrés** (transaction_id, temps d'inférence, CPU, mémoire, etc.)
 - Création automatique des index avec mapping adapté
 - Indexation en masse (bulk insert)
 - Gestion de la connexion
@@ -161,11 +162,11 @@ pipeline.run_continuous(limit=100, poll_interval=10)
 
 ## Structure des index Elasticsearch
 
-Le pipeline crée automatiquement deux index distincts :
+Le pipeline crée automatiquement trois index distincts :
 
-### 1. Index `ml-api-logs` - Logs bruts complets
+### 1. Index `ml-api-logs` - Logs bruts complets (NON FILTRÉS)
 
-Contient tous les logs avec l'ensemble des champs :
+Contient **TOUS les logs de l'API sans aucun filtrage** avec l'ensemble des champs :
 - `@timestamp` : Date/heure du log (format ISO 8601)
 - `level` : Niveau de log (INFO, ERROR, etc.)
 - `logger` : Nom du logger
@@ -179,9 +180,9 @@ Contient tous les logs avec l'ensemble des champs :
 - `input_data` : Données d'entrée de la prédiction (objet JSON)
 - `result` : Résultat de la prédiction (objet JSON)
 
-### 2. Index `ml-api-message` - Messages parsés uniquement
+### 2. Index `ml-api-message` - Messages parsés (FILTRÉS)
 
-Contient uniquement les logs qui ont été parsés avec succès (avec input_data et result) :
+Contient uniquement les logs **filtrés** qui ont été parsés avec succès (avec input_data et result) :
 - `@timestamp` : Date/heure du log
 - `transaction_id` : ID unique de la transaction
 - `http_method` : Méthode HTTP
@@ -197,10 +198,23 @@ Contient uniquement les logs qui ont été parsés avec succès (avec input_data
   - probability (0.0 à 1.0)
   - message (texte descriptif)
 
+### 3. Index `ml-api-perfs` - Métriques de performance (FILTRÉS)
+
+Contient uniquement les métriques de performance **filtrées** :
+- `@timestamp` : Date/heure du log
+- `transaction_id` : ID unique de la transaction
+- `inference_time_ms` : Temps d'inférence en ms
+- `cpu_time_ms` : Temps CPU en ms
+- `memory_mb` : Mémoire utilisée en MB
+- `memory_delta_mb` : Delta de mémoire en MB
+- `function_calls` : Nombre d'appels de fonctions
+- `latency_ms` : Latence totale en ms
+- `top_functions` : Liste des fonctions les plus coûteuses (nested)
+
 **Avantages de la triple indexation :**
-- `ml-api-logs` : Pour le débogage et l'audit complet
-- `ml-api-message` : Pour l'analyse des prédictions et du drift de données
-- `ml-api-perfs` : Pour l'analyse des performances et l'optimisation du modèle
+- `ml-api-logs` : **TOUS les logs** pour le débogage complet et l'audit (aucun filtrage)
+- `ml-api-message` : Logs **filtrés** pour l'analyse des prédictions et du drift de données
+- `ml-api-perfs` : Logs **filtrés** pour l'analyse des performances et l'optimisation du modèle
 
 ## Visualisation avec Kibana
 

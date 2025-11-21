@@ -239,6 +239,49 @@ make logs
 - Affiche les 50 derniers logs
 - Format JSON lisible
 
+### Vider le cache des logs Redis
+
+#### API locale
+
+```bash
+make clear-logs
+```
+
+- Appelle l'endpoint `DELETE /logs` de l'API locale
+- Supprime tous les logs du cache Redis
+- Utile après des tests de charge ou pour maintenance
+- **Note** : Ne supprime pas les logs déjà indexés dans Elasticsearch
+
+**Exemple de réponse** :
+```json
+{
+  "message": "Logs supprimés avec succès"
+}
+```
+
+#### Via Gradio local
+
+```bash
+make clear-logs-gradio-local
+```
+
+- Vide les logs via l'interface Gradio locale (port 7860)
+- Utilise le client Gradio pour appeler l'endpoint `/api_clear_logs_proxy`
+- Utile quand l'API n'est pas directement accessible
+
+#### Via Gradio HuggingFace Spaces
+
+```bash
+make clear-logs-gradio-hf
+```
+
+- Vide les logs via Gradio déployé sur HuggingFace Spaces
+- Charge automatiquement `HF_TOKEN` depuis `.env` si disponible
+- URL configurée : `https://francoisformation-oc-project8.hf.space`
+- **Note** : Nécessite le token HF pour les Spaces privés
+
+**Documentation complète** : [CLEAR_LOGS_ENDPOINT.md](CLEAR_LOGS_ENDPOINT.md)
+
 ### Tester une prédiction
 
 ```bash

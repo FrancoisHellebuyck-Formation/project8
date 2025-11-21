@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs logs-gradio-local logs-gradio-hf health predict-test pipeline-check pipeline-once pipeline-continuous pipeline-elasticsearch-up pipeline-elasticsearch-down simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs clear-logs logs-gradio-local logs-gradio-hf health predict-test pipeline-check pipeline-once pipeline-continuous pipeline-elasticsearch-up pipeline-elasticsearch-down simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze
 
 # Variables
 PYTHON := python
@@ -57,6 +57,7 @@ help:
 	@echo ""
 	@echo "$(GREEN)Utilitaires:$(NC)"
 	@echo "  make logs             - Affiche les logs de l'API via endpoint"
+	@echo "  make clear-logs       - Vide le cache des logs Redis"
 	@echo "  make logs-gradio-local - Affiche les logs via Gradio local"
 	@echo "  make logs-gradio-hf   - Affiche les logs via Gradio HF Spaces"
 	@echo "  make health           - Vérifie la santé de l'API"
@@ -277,6 +278,31 @@ logs:
 	@curl -s http://localhost:$(API_PORT)/logs?limit=50 | \
 		$(PYTHON) -m json.tool || \
 		echo "$(RED)✗ Impossible de récupérer les logs$(NC)"
+
+## clear-logs: Vide le cache des logs Redis (API locale)
+clear-logs:
+	@echo "$(BLUE)Suppression des logs du cache Redis...$(NC)"
+	@curl -X DELETE -s http://localhost:$(API_PORT)/logs | \
+		$(PYTHON) -m json.tool && \
+		echo "$(GREEN)✓ Logs supprimés avec succès$(NC)" || \
+		echo "$(RED)✗ Échec de la suppression des logs$(NC)"
+
+## clear-logs-gradio-local: Vide le cache Redis via Gradio local
+clear-logs-gradio-local:
+	@echo "$(BLUE)Suppression des logs via Gradio local...$(NC)"
+	@GRADIO_URL=http://localhost:7860 $(UV) run python3 clear_logs_gradio.py
+
+## clear-logs-gradio-hf: Vide le cache Redis via Gradio HF Spaces
+clear-logs-gradio-hf:
+	@echo "$(BLUE)Suppression des logs via Gradio HF Spaces...$(NC)"
+	@if [ -f .env ]; then \
+		echo "$(YELLOW)Chargement de HF_TOKEN depuis .env...$(NC)"; \
+		export $$(cat .env | grep -v '^#' | grep HF_TOKEN | xargs) && \
+		GRADIO_URL=$(GRADIO_HF_URL) $(UV) run python3 clear_logs_gradio.py; \
+	else \
+		echo "$(YELLOW)⚠️  Fichier .env non trouvé, test sans token$(NC)"; \
+		GRADIO_URL=$(GRADIO_HF_URL) $(UV) run python3 clear_logs_gradio.py; \
+	fi
 
 ## logs-gradio-local: Affiche les logs via Gradio local
 logs-gradio-local:
