@@ -57,8 +57,9 @@ def clear_logs_via_gradio(gradio_url: str, hf_token: str = None):
         # Appeler le proxy api_clear_logs_proxy
         result = client.predict(api_name="/api_clear_logs_proxy")
 
-        # result est un tuple (response_json, status_code)
+        # Gérer les deux formats possibles de réponse
         if isinstance(result, tuple) and len(result) == 2:
+            # Format: (response_json, status_code)
             response_json, status_code = result
 
             print(f"📊 Status HTTP: {status_code}")
@@ -71,6 +72,11 @@ def clear_logs_via_gradio(gradio_url: str, hf_token: str = None):
                 print(f"❌ Erreur HTTP {status_code}")
                 print(f"📄 Réponse: {json.dumps(response_json, indent=2)}")
                 return response_json
+        elif isinstance(result, dict):
+            # Format: response_json uniquement (wrapper Gradio simplifié)
+            print("✅ Logs supprimés avec succès")
+            print(f"📄 Réponse: {json.dumps(result, indent=2)}")
+            return result
         else:
             print(f"⚠️  Format de réponse inattendu: {result}")
             return result
