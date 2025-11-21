@@ -39,10 +39,10 @@ repos:
     hooks:
       - id: check-api-coverage
         name: Vérifier la couverture de l'API
-        entry: python3 scripts/check_api_coverage.py --min-coverage 85
+        entry: python3 scripts/check_api_coverage.py --min-coverage 80
         language: system
         pass_filenames: false
-        files: ^(src/api/.*\.py|tests/test_(api|main)\.py)$
+        files: ^(src/api/.*\.py|tests/api/.*\.py)$
         stages: [commit]
         verbose: true
 

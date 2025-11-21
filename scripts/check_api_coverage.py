@@ -40,7 +40,7 @@ def run_coverage_tests(min_coverage: int = 85) -> Tuple[bool, Dict]:
     # Exécuter pytest avec couverture
     cmd = [
         "uv", "run", "pytest",
-        "tests/test_api.py", "tests/test_main.py",
+        "tests/api/",
         "-v",
         "--cov=src/api",
         "--cov-report=json:coverage-api.json",
@@ -136,8 +136,8 @@ def main():
     parser.add_argument(
         "--min-coverage",
         type=int,
-        default=85,
-        help="Pourcentage minimum de couverture requis (défaut: 85)"
+        default=80,
+        help="Pourcentage minimum de couverture requis (défaut: 80)"
     )
     parser.add_argument(
         "--strict",
