@@ -129,8 +129,8 @@ jobs:
     - name: Run Bandit security scanner
       run: |
         echo "🔒 Analyse de sécurité avec Bandit..."
-        uv run bandit -r src/ -f json -o bandit-report.json || true
-        uv run bandit -r src/ -f txt
+        uv run bandit -r src/ --configfile .bandit -f json -o bandit-report.json || true
+        uv run bandit -r src/ --configfile .bandit -f txt
       continue-on-error: false
 
     - name: Run Safety vulnerability scanner
