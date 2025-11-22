@@ -1,0 +1,26 @@
+# Safety Policy - Configuration pour ignorer les vulnérabilités documentées
+# Documentation: https://docs.safetycli.com/
+
+security:
+  # Ignorer les vulnérabilités spécifiques avec justification
+  ignore-vulnerabilities:
+    # CVE-2024-39236 - Gradio code injection (DISPUTED)
+    72086:
+      reason: |
+        Vulnérabilité CVE-2024-39236 marquée comme DISPUTED par Hugging Face.
+        Type: Code injection dans /gradio/component_meta.py
+
+        Mesures d'atténuation en place:
+        - Gradio tourne dans un conteneur Docker isolé
+        - Pas d'accès direct aux données sensibles
+        - Communication uniquement via l'API REST FastAPI
+        - Déployé sur Hugging Face Spaces avec leurs contrôles de sécurité
+        - Les données de patients sont synthétiques (pas de PII)
+
+        Plan de mise à jour:
+        - Sera mis à jour dès qu'une version corrigée non-disputed sera disponible
+        - Surveillance continue des nouvelles versions de Gradio
+
+        Documentation complète: docs/SECURITY.md
+
+      expires: '2025-12-31'

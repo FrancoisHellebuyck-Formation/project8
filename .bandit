@@ -1,0 +1,34 @@
+# Configuration Bandit - Règles de sécurité du projet
+# Documentation: https://bandit.readthedocs.io/en/latest/config.html
+
+exclude_dirs:
+  - /tests
+  - /.venv
+  - /venv
+  - /.git
+  - /__pycache__
+  - /.pytest_cache
+  - /notebooks
+
+skips:
+  - B104
+  - B301
+  - B311
+  - B403
+
+# B104: Hardcoded bind all interfaces (0.0.0.0)
+# JUSTIFICATION: Requis pour Docker et déploiement en production.
+# Les conteneurs Docker nécessitent 0.0.0.0 pour accepter les connexions
+# depuis l'extérieur du conteneur. En production, le pare-feu et le
+# reverse proxy (nginx) gèrent la sécurité réseau.
+
+# B301/B403: Pickle usage (import and load)
+# JUSTIFICATION: Utilisé uniquement pour charger les modèles ML scikit-learn
+# depuis des fichiers .pkl créés par notre pipeline d'entraînement interne.
+# Standard de l'industrie ML. Aucun chargement de pickles non fiables.
+# Voir docs/SECURITY.md pour la justification complète.
+
+# B311: Standard pseudo-random generators (random module)
+# JUSTIFICATION: Utilisé uniquement pour la génération de données de test
+# dans le simulateur de charge. Ces données ne sont pas utilisées à des
+# fins cryptographiques ou de sécurité, seulement pour simuler des patients.

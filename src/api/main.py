@@ -324,8 +324,16 @@ async def predict(patient: PatientData, request: Request):
                     try:
                         proba = model_instance.predict_proba(processed_data)
                         probability = float(proba[0][1])
-                    except Exception:
-                        pass
+                    except AttributeError:
+                        # Modèle ne supporte pas predict_proba
+                        logger.debug(
+                            "Modèle ne supporte pas predict_proba"
+                        )
+                    except Exception as e:
+                        # Erreur lors du calcul des probabilités
+                        logger.warning(
+                            f"Erreur lors du calcul de probabilité: {e}"
+                        )
 
         # Mode singleton (fallback)
         else:
@@ -339,8 +347,16 @@ async def predict(patient: PatientData, request: Request):
                 try:
                     proba = predictor.predict_proba(patient_dict)
                     probability = float(proba[0][1])
-                except Exception:
-                    pass
+                except AttributeError:
+                    # Modèle ne supporte pas predict_proba
+                    logger.debug(
+                        "Modèle ne supporte pas predict_proba"
+                    )
+                except Exception as e:
+                    # Erreur lors du calcul des probabilités
+                    logger.warning(
+                        f"Erreur lors du calcul de probabilité: {e}"
+                    )
 
         # Récupérer le transaction_id si disponible
         transaction_id = getattr(request.state, 'transaction_id', None)
