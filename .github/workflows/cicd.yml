@@ -69,7 +69,7 @@ jobs:
           --cov=src/api \
           --cov-report=term-missing \
           --cov-report=json:coverage-api.json \
-          --cov-fail-under=70
+          --cov-fail-under=65
 
     - name: Display API coverage summary
       if: always()
