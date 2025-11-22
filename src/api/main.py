@@ -17,8 +17,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import settings
 from ..model import ModelLoader, Predictor
-from ..model.model_pool import ModelPool, ModelContextManager
+from ..model.model_pool import ModelPool
 from ..model.feature_engineering import FeatureEngineer
+from ..model.model_router import ModelRouter, ModelType
+from ..model.onnx_loader import ONNXModelLoader
 from .logging_config import (
     clear_redis_logs,
     get_redis_logs,
@@ -37,7 +39,7 @@ from .schemas import (
 # Variables globales
 predictor: Optional[Predictor] = None
 logger: Optional[logging.Logger] = None
-model_pool: Optional[ModelPool] = None
+model_router: Optional[ModelRouter] = None
 feature_engineer: Optional[FeatureEngineer] = None
 
 
@@ -45,40 +47,98 @@ feature_engineer: Optional[FeatureEngineer] = None
 async def lifespan(app: FastAPI):
     """Gère le cycle de vie de l'application (startup/shutdown)."""
     # Startup
-    global predictor, logger, model_pool, feature_engineer
+    global predictor, logger, model_router, feature_engineer
 
     # Configurer le logging
     logger = setup_logging()
     logger.info("Démarrage de l'API...")
 
-    # Initialiser le pool de modèles (mode parallèle)
+    # Initialiser le routeur de modèles
+    model_router = ModelRouter()
+
+    # Initialiser le pool scikit-learn
     try:
         logger.info(
-            f"Initialisation du pool de modèles "
+            f"Initialisation du pool scikit-learn "
             f"(taille: {settings.MODEL_POOL_SIZE})..."
         )
-        model_pool = ModelPool()
-        model_pool.initialize()
-        feature_engineer = FeatureEngineer()
+        sklearn_pool = ModelPool()
+        sklearn_pool.initialize(
+            pool_size=settings.MODEL_POOL_SIZE,
+            model_path=settings.MODEL_PATH
+        )
+        model_router.register_pool(ModelType.SKLEARN, sklearn_pool)
         logger.info(
-            f"✅ Pool de {settings.MODEL_POOL_SIZE} modèles initialisé"
+            f"✅ Pool scikit-learn de {settings.MODEL_POOL_SIZE} "
+            "modèles initialisé"
         )
     except Exception as e:
-        error_msg = f"Erreur lors de l'initialisation du pool : {str(e)}"
-        logger.error(error_msg)
-        # Fallback: charger le modèle en mode singleton (ancien comportement)
-        logger.warning(
-            "⚠️  Fallback au mode singleton (sans pool)"
-        )
+        logger.error(f"Erreur initialisation pool scikit-learn: {e}")
+        # Fallback: charger en mode singleton
+        logger.warning("⚠️  Fallback au mode singleton (sans pool)")
         try:
             model_loader = ModelLoader()
             model_loader.load_model()
             predictor = Predictor()
             logger.info("Modèle chargé avec succès (mode singleton)")
         except Exception as e2:
-            error_msg = f"Erreur lors du chargement du modèle : {str(e2)}"
+            error_msg = f"Erreur chargement modèle : {str(e2)}"
             logger.error(error_msg)
             raise RuntimeError(error_msg) from e2
+
+    # Initialiser le pool ONNX si activé
+    if settings.ENABLE_ONNX:
+        try:
+            logger.info(
+                f"Initialisation du pool ONNX "
+                f"(taille: {settings.ONNX_POOL_SIZE})..."
+            )
+
+            # Créer un modèle ONNX de base
+            from pathlib import Path
+            if Path(settings.ONNX_MODEL_PATH).exists():
+                onnx_base_model = ONNXModelLoader(settings.ONNX_MODEL_PATH)
+
+                # Créer le pool ONNX
+                onnx_pool = ModelPool()
+                onnx_pool.initialize(
+                    pool_size=settings.ONNX_POOL_SIZE,
+                    model_path=settings.ONNX_MODEL_PATH,
+                    base_model=onnx_base_model
+                )
+                model_router.register_pool(ModelType.ONNX, onnx_pool)
+                logger.info(
+                    f"✅ Pool ONNX de {settings.ONNX_POOL_SIZE} "
+                    "modèles initialisé"
+                )
+            else:
+                logger.warning(
+                    f"Modèle ONNX non trouvé: {settings.ONNX_MODEL_PATH}"
+                )
+                logger.warning(
+                    "Le pool ONNX ne sera pas disponible. "
+                    "Utilisez 'make convert-onnx' pour créer le modèle."
+                )
+        except ImportError:
+            logger.warning(
+                "onnxruntime non installé. Pool ONNX désactivé. "
+                "Installez avec: uv add onnxruntime"
+            )
+        except Exception as e:
+            logger.error(f"Erreur initialisation pool ONNX: {e}")
+            logger.warning("Le pool ONNX ne sera pas disponible")
+
+    # Définir le type de modèle par défaut
+    default_type_str = settings.DEFAULT_MODEL_TYPE.lower()
+    if default_type_str == "onnx" and model_router.is_available(ModelType.ONNX):
+        model_router.set_default_type(ModelType.ONNX)
+        logger.info("Type de modèle par défaut: ONNX")
+    else:
+        model_router.set_default_type(ModelType.SKLEARN)
+        logger.info("Type de modèle par défaut: scikit-learn")
+
+    # Initialiser le feature engineer
+    feature_engineer = FeatureEngineer()
 
     # Afficher l'état du monitoring de performance
     if settings.ENABLE_PERFORMANCE_MONITORING:
@@ -89,13 +149,16 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Performance monitoring: désactivé")
 
+    # Afficher les types de modèles disponibles
+    available_types = model_router.get_available_types()
+    logger.info(f"Types de modèles disponibles: {available_types}")
+
     yield
 
     # Shutdown
     logger.info("Arrêt de l'API...")
-    if model_pool and model_pool.is_initialized():
-        stats = model_pool.get_stats()
-        logger.info(f"Statistiques du pool: {stats}")
+    if model_router:
+        model_router.shutdown()
 
 
 # Créer l'application FastAPI
@@ -249,8 +312,8 @@ async def health_check():
     Retourne le statut de l'API, si le modèle est chargé
     et si Redis est connecté.
     """
-    # Vérifier si le pool est initialisé ou le predictor singleton
-    if model_pool and model_pool.is_initialized():
+    # Vérifier si le routeur est initialisé ou le predictor singleton
+    if model_router and len(model_router.get_available_types()) > 0:
         model_loaded = True
     elif predictor is not None and predictor.model_loader.is_loaded():
         model_loaded = True
@@ -275,20 +338,29 @@ async def health_check():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-async def predict(patient: PatientData, request: Request):
+async def predict(
+    patient: PatientData,
+    request: Request,
+    model_type: Optional[str] = Query(
+        None,
+        description="Type de modèle (sklearn ou onnx). "
+                    "Si non spécifié, utilise le modèle par défaut."
+    )
+):
     """
     Effectue une prédiction pour un patient.
 
     Args:
         patient: Données du patient (14 features de base).
         request: Objet Request pour accéder au transaction_id.
+        model_type: Type de modèle à utiliser (sklearn ou onnx).
 
     Returns:
         PredictionResponse: Résultat de la prédiction.
     """
-    # Vérifier si le pool ou le predictor est disponible
-    if model_pool is None and predictor is None:
-        logger.error("Ni pool ni predictor initialisés")
+    # Vérifier si le routeur ou le predictor est disponible
+    if model_router is None and predictor is None:
+        logger.error("Ni routeur ni predictor initialisés")
         raise HTTPException(
             status_code=500,
             detail="Le modèle n'est pas chargé"
@@ -298,10 +370,22 @@ async def predict(patient: PatientData, request: Request):
         # Convertir les données Pydantic en dict
         patient_dict = patient.model_dump(by_alias=True)
 
-        # Mode pool (parallèle) - préféré
-        if model_pool and model_pool.is_initialized():
+        # Déterminer le type de modèle à utiliser
+        requested_type = None
+        if model_type:
+            try:
+                requested_type = ModelType(model_type.lower())
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Type de modèle invalide: {model_type}. "
+                           f"Types disponibles: {model_router.get_available_types()}"
+                )
+
+        # Mode routeur (avec pools) - préféré
+        if model_router:
             # Utiliser le context manager pour acquérir/libérer le modèle
-            async with ModelContextManager() as model_instance:
+            async with model_router.acquire_model(requested_type) as model_instance:
                 # Profiler la prédiction si le monitoring est activé
                 with performance_monitor.profile():
                     # Préparer les données avec feature engineering
@@ -324,8 +408,16 @@ async def predict(patient: PatientData, request: Request):
                     try:
                         proba = model_instance.predict_proba(processed_data)
                         probability = float(proba[0][1])
-                    except Exception:
-                        pass
+                    except AttributeError:
+                        # Modèle ne supporte pas predict_proba
+                        logger.debug(
+                            "Modèle ne supporte pas predict_proba"
+                        )
+                    except Exception as e:
+                        # Erreur lors du calcul des probabilités
+                        logger.warning(
+                            f"Erreur lors du calcul de probabilité: {e}"
+                        )
 
         # Mode singleton (fallback)
         else:
@@ -339,8 +431,16 @@ async def predict(patient: PatientData, request: Request):
                 try:
                     proba = predictor.predict_proba(patient_dict)
                     probability = float(proba[0][1])
-                except Exception:
-                    pass
+                except AttributeError:
+                    # Modèle ne supporte pas predict_proba
+                    logger.debug(
+                        "Modèle ne supporte pas predict_proba"
+                    )
+                except Exception as e:
+                    # Erreur lors du calcul des probabilités
+                    logger.warning(
+                        f"Erreur lors du calcul de probabilité: {e}"
+                    )
 
         # Récupérer le transaction_id si disponible
         transaction_id = getattr(request.state, 'transaction_id', None)
@@ -374,20 +474,29 @@ async def predict(patient: PatientData, request: Request):
     response_model=PredictionProbabilityResponse,
     tags=["Prediction"]
 )
-async def predict_proba(patient: PatientData, request: Request):
+async def predict_proba(
+    patient: PatientData,
+    request: Request,
+    model_type: Optional[str] = Query(
+        None,
+        description="Type de modèle (sklearn ou onnx). "
+                    "Si non spécifié, utilise le modèle par défaut."
+    )
+):
     """
     Effectue une prédiction avec probabilités pour un patient.
 
     Args:
         patient: Données du patient (14 features de base).
         request: Objet Request pour accéder au transaction_id.
+        model_type: Type de modèle à utiliser (sklearn ou onnx).
 
     Returns:
         PredictionProbabilityResponse: Résultat avec probabilités.
     """
-    # Vérifier si le pool ou le predictor est disponible
-    if model_pool is None and predictor is None:
-        logger.error("Ni pool ni predictor initialisés")
+    # Vérifier si le routeur ou le predictor est disponible
+    if model_router is None and predictor is None:
+        logger.error("Ni routeur ni predictor initialisés")
         raise HTTPException(
             status_code=500,
             detail="Le modèle n'est pas chargé"
@@ -397,10 +506,22 @@ async def predict_proba(patient: PatientData, request: Request):
         # Convertir les données Pydantic en dict
         patient_dict = patient.model_dump(by_alias=True)
 
-        # Mode pool (parallèle) - préféré
-        if model_pool and model_pool.is_initialized():
+        # Déterminer le type de modèle à utiliser
+        requested_type = None
+        if model_type:
+            try:
+                requested_type = ModelType(model_type.lower())
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Type de modèle invalide: {model_type}. "
+                           f"Types disponibles: {model_router.get_available_types()}"
+                )
+
+        # Mode routeur (avec pools) - préféré
+        if model_router:
             # Utiliser le context manager pour acquérir/libérer le modèle
-            async with ModelContextManager() as model_instance:
+            async with model_router.acquire_model(requested_type) as model_instance:
                 # Profiler la prédiction si le monitoring est activé
                 with performance_monitor.profile():
                     # Préparer les données avec feature engineering
@@ -462,21 +583,42 @@ async def predict_proba(patient: PatientData, request: Request):
 @app.get("/pool/stats", tags=["Pool"])
 async def get_pool_stats():
     """
-    Récupère les statistiques du pool de modèles.
+    Récupère les statistiques de tous les pools de modèles.
 
     Returns:
-        dict: Statistiques du pool (taille, utilisation, etc.).
+        dict: Statistiques de tous les pools (sklearn, onnx).
     """
-    if model_pool and model_pool.is_initialized():
-        stats = model_pool.get_stats()
+    if model_router:
+        stats = model_router.get_stats()
         return {
-            "pool_enabled": True,
+            "router_enabled": True,
             "stats": stats
         }
     else:
         return {
-            "pool_enabled": False,
-            "message": "Pool non initialisé (mode singleton actif)"
+            "router_enabled": False,
+            "message": "Routeur non initialisé (mode singleton actif)"
+        }
+
+
+@app.get("/models/types", tags=["Models"])
+async def get_model_types():
+    """
+    Récupère la liste des types de modèles disponibles.
+
+    Returns:
+        dict: Liste des types disponibles et type par défaut.
+    """
+    if model_router:
+        return {
+            "available_types": model_router.get_available_types(),
+            "default_type": model_router._default_type.value
+        }
+    else:
+        return {
+            "available_types": [],
+            "default_type": None,
+            "message": "Routeur non initialisé"
         }
 
 

@@ -96,6 +96,10 @@ help:
 	@echo "$(GREEN)Analyse:$(NC)"
 	@echo "  make drift-analyze    - Analyse le data drift"
 	@echo ""
+	@echo "$(GREEN)Migration ONNX:$(NC)"
+	@echo "  make convert-onnx     - Convertit le modèle en ONNX (avec validation)"
+	@echo "  make convert-onnx-quick - Conversion ONNX rapide (sans validation)"
+	@echo ""
 
 ## install: Installe les dépendances de production
 install:
@@ -602,6 +606,18 @@ dev: setup run-redis
 ## ci: Commandes pour CI/CD
 ci: lint test
 	@echo "$(GREEN)✓ CI/CD checks passed$(NC)"
+
+## convert-onnx: Convertit le modèle pickle en ONNX
+convert-onnx:
+	@echo "$(BLUE)Conversion du modèle en ONNX...$(NC)"
+	$(PYTHON) scripts/convert_to_onnx.py --validate
+	@echo "$(GREEN)✓ Conversion terminée$(NC)"
+
+## convert-onnx-quick: Conversion ONNX sans validation
+convert-onnx-quick:
+	@echo "$(BLUE)Conversion rapide en ONNX...$(NC)"
+	$(PYTHON) scripts/convert_to_onnx.py
+	@echo "$(GREEN)✓ Conversion terminée$(NC)"
 
 # Cibles par défaut
 .DEFAULT_GOAL := help

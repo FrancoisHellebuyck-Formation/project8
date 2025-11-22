@@ -54,6 +54,7 @@ def predict(
     swallowing_difficulty: bool,
     chest_pain: bool,
     chronic_disease: bool,
+    model_type: str = "sklearn",
 ):
     """
     Envoie les données du patient à l'API et retourne la visualisation.
@@ -74,6 +75,7 @@ def predict(
         swallowing_difficulty: Difficulté à avaler
         chest_pain: Douleur thoracique
         chronic_disease: Maladie chronique
+        model_type: Type de modèle (sklearn ou onnx)
 
     Returns:
         str: HTML avec barre de progression colorée
@@ -144,10 +146,12 @@ def predict(
     logger.info("=" * 60)
 
     try:
-        # Appel à l'API
-        response = requests.post(
-            f"{settings.API_URL}/predict", json=payload, timeout=10
-        )
+        # Appel à l'API avec le type de modèle
+        url = f"{settings.API_URL}/predict"
+        if model_type and model_type.lower() != "sklearn":
+            url += f"?model_type={model_type.lower()}"
+
+        response = requests.post(url, json=payload, timeout=10)
         response.raise_for_status()
 
         data = response.json()
@@ -381,6 +385,14 @@ def create_interface() -> gr.Blocks:
                     label="Maladie chronique", value=False
                 )
 
+                gr.Markdown("### 🤖 Configuration du modèle")
+                model_type_input = gr.Radio(
+                    choices=["sklearn", "onnx"],
+                    value="sklearn",
+                    label="Type de modèle",
+                    info="sklearn (pickle) ou ONNX (optimisé)",
+                )
+
                 gr.Markdown("### 🎯 Résultat")
                 predict_btn = gr.Button(
                     "Obtenir la prédiction", variant="primary", size="lg"
@@ -410,6 +422,7 @@ def create_interface() -> gr.Blocks:
                 swallowing_input,
                 chest_pain_input,
                 chronic_disease_input,
+                model_type_input,
             ],
             outputs=result_html,
         )

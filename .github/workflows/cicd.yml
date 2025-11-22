@@ -41,6 +41,12 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
+    - name: Convert model to ONNX
+      run: |
+        echo "🔄 Conversion du modèle pickle vers ONNX..."
+        uv run python scripts/convert_to_onnx.py --validate
+        echo "✅ Modèle ONNX créé avec succès"
+
     - name: Run tests with pytest
       run: |
         uv run pytest tests/ --cov=src --cov-report=xml --cov-report=html --cov-report=term-missing --cov-fail-under=70 -v
@@ -129,15 +135,15 @@ jobs:
     - name: Run Bandit security scanner
       run: |
         echo "🔒 Analyse de sécurité avec Bandit..."
-        uv run bandit -r src/ -f json -o bandit-report.json || true
-        uv run bandit -r src/ -f txt
+        uv run bandit -r src/ --configfile .bandit -f json -o bandit-report.json || true
+        uv run bandit -r src/ --configfile .bandit -f txt
       continue-on-error: false
 
     - name: Run Safety vulnerability scanner
       run: |
         echo "🔍 Scan des vulnérabilités avec Safety..."
-        uv run safety check --json --output safety-report.json || true
-        uv run safety check
+        uv run safety check --policy-file .safety-policy.yml --json --output safety-report.json || true
+        uv run safety check --policy-file .safety-policy.yml
       continue-on-error: false
 
     - name: Upload security reports
