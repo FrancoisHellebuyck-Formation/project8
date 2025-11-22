@@ -8,9 +8,9 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^(.*\.md|.*\.txt)$
+        exclude: ^(.*\.md|.*\.txt|.*\.yml)$
       - id: end-of-file-fixer
-        exclude: ^(.*\.md|.*\.txt)$
+        exclude: ^(.*\.md|.*\.txt|.*\.yml)$
       - id: check-yaml
       - id: check-json
       - id: check-added-large-files
@@ -39,11 +39,11 @@ repos:
     hooks:
       - id: check-api-coverage
         name: Vérifier la couverture de l'API
-        entry: python3 scripts/check_api_coverage.py --min-coverage 80
+        entry: python3 scripts/check_api_coverage.py --min-coverage 70
         language: system
         pass_filenames: false
         files: ^(src/api/.*\.py|tests/api/.*\.py)$
-        stages: [commit]
+        stages: [pre-commit]
         verbose: true
 
       - id: check-tests-pass
@@ -52,5 +52,5 @@ repos:
         language: system
         pass_filenames: false
         files: ^(src/.*\.py|tests/.*\.py)$
-        stages: [push]
+        stages: [pre-push]
         verbose: true

@@ -39,7 +39,7 @@ extend-ignore = [
 exclude = [
     ".git",
     "__pycache__",
-    ".venv", 
+    ".venv",
     "venv",
     ".jupyter",
     "alembic/versions",
@@ -58,6 +58,7 @@ dev = [
     "pytest-cov>=6.0.0",
     "httpx>=0.28.0",
     "gradio-client>=1.13.3",
+    "pre-commit>=4.4.0",
 ]
 
 [tool.pytest.ini_options]

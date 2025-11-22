@@ -17,6 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import settings
 from ..model import ModelLoader, Predictor
+from ..model.model_pool import ModelPool, ModelContextManager
+from ..model.feature_engineering import FeatureEngineer
 from .logging_config import (
     clear_redis_logs,
     get_redis_logs,
@@ -35,28 +37,48 @@ from .schemas import (
 # Variables globales
 predictor: Optional[Predictor] = None
 logger: Optional[logging.Logger] = None
+model_pool: Optional[ModelPool] = None
+feature_engineer: Optional[FeatureEngineer] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gère le cycle de vie de l'application (startup/shutdown)."""
     # Startup
-    global predictor, logger
+    global predictor, logger, model_pool, feature_engineer
 
     # Configurer le logging
     logger = setup_logging()
     logger.info("Démarrage de l'API...")
 
-    # Charger le modèle au démarrage
+    # Initialiser le pool de modèles (mode parallèle)
     try:
-        model_loader = ModelLoader()
-        model_loader.load_model()
-        predictor = Predictor()
-        logger.info("Modèle chargé avec succès")
+        logger.info(
+            f"Initialisation du pool de modèles "
+            f"(taille: {settings.MODEL_POOL_SIZE})..."
+        )
+        model_pool = ModelPool()
+        model_pool.initialize()
+        feature_engineer = FeatureEngineer()
+        logger.info(
+            f"✅ Pool de {settings.MODEL_POOL_SIZE} modèles initialisé"
+        )
     except Exception as e:
-        error_msg = f"Erreur lors du chargement du modèle : {str(e)}"
+        error_msg = f"Erreur lors de l'initialisation du pool : {str(e)}"
         logger.error(error_msg)
-        raise RuntimeError(error_msg) from e
+        # Fallback: charger le modèle en mode singleton (ancien comportement)
+        logger.warning(
+            "⚠️  Fallback au mode singleton (sans pool)"
+        )
+        try:
+            model_loader = ModelLoader()
+            model_loader.load_model()
+            predictor = Predictor()
+            logger.info("Modèle chargé avec succès (mode singleton)")
+        except Exception as e2:
+            error_msg = f"Erreur lors du chargement du modèle : {str(e2)}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg) from e2
 
     # Afficher l'état du monitoring de performance
     if settings.ENABLE_PERFORMANCE_MONITORING:
@@ -71,6 +93,9 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Arrêt de l'API...")
+    if model_pool and model_pool.is_initialized():
+        stats = model_pool.get_stats()
+        logger.info(f"Statistiques du pool: {stats}")
 
 
 # Créer l'application FastAPI
@@ -224,7 +249,14 @@ async def health_check():
     Retourne le statut de l'API, si le modèle est chargé
     et si Redis est connecté.
     """
-    model_loaded = predictor is not None and predictor.model_loader.is_loaded()  # noqa: E501
+    # Vérifier si le pool est initialisé ou le predictor singleton
+    if model_pool and model_pool.is_initialized():
+        model_loaded = True
+    elif predictor is not None and predictor.model_loader.is_loaded():
+        model_loaded = True
+    else:
+        model_loaded = False
+
     redis_connected = is_redis_connected()
 
     status = "healthy" if model_loaded else "unhealthy"
@@ -254,8 +286,9 @@ async def predict(patient: PatientData, request: Request):
     Returns:
         PredictionResponse: Résultat de la prédiction.
     """
-    if predictor is None:
-        logger.error("Predictor non initialisé")
+    # Vérifier si le pool ou le predictor est disponible
+    if model_pool is None and predictor is None:
+        logger.error("Ni pool ni predictor initialisés")
         raise HTTPException(
             status_code=500,
             detail="Le modèle n'est pas chargé"
@@ -265,19 +298,49 @@ async def predict(patient: PatientData, request: Request):
         # Convertir les données Pydantic en dict
         patient_dict = patient.model_dump(by_alias=True)
 
-        # Profiler la prédiction si le monitoring est activé
-        with performance_monitor.profile():
-            # Effectuer la prédiction
-            prediction = predictor.predict(patient_dict)
-            pred_value = int(prediction[0])
+        # Mode pool (parallèle) - préféré
+        if model_pool and model_pool.is_initialized():
+            # Utiliser le context manager pour acquérir/libérer le modèle
+            async with ModelContextManager() as model_instance:
+                # Profiler la prédiction si le monitoring est activé
+                with performance_monitor.profile():
+                    # Préparer les données avec feature engineering
+                    processed_data = feature_engineer.engineer_features(
+                        patient_dict
+                    )
 
-            # Obtenir la probabilité si disponible
-            probability = None
-            try:
-                proba = predictor.predict_proba(patient_dict)
-                probability = float(proba[0][1])  # Probabilité classe positive  # noqa: E501
-            except Exception:
-                pass
+                    # Réordonner les colonnes si nécessaire
+                    if hasattr(model_instance.model, 'feature_names_in_'):
+                        processed_data = processed_data[
+                            model_instance.model.feature_names_in_
+                        ]
+
+                    # Effectuer la prédiction
+                    prediction = model_instance.predict(processed_data)
+                    pred_value = int(prediction[0])
+
+                    # Obtenir la probabilité si disponible
+                    probability = None
+                    try:
+                        proba = model_instance.predict_proba(processed_data)
+                        probability = float(proba[0][1])
+                    except Exception:
+                        pass
+
+        # Mode singleton (fallback)
+        else:
+            with performance_monitor.profile():
+                # Effectuer la prédiction
+                prediction = predictor.predict(patient_dict)
+                pred_value = int(prediction[0])
+
+                # Obtenir la probabilité si disponible
+                probability = None
+                try:
+                    proba = predictor.predict_proba(patient_dict)
+                    probability = float(proba[0][1])
+                except Exception:
+                    pass
 
         # Récupérer le transaction_id si disponible
         transaction_id = getattr(request.state, 'transaction_id', None)
@@ -322,8 +385,9 @@ async def predict_proba(patient: PatientData, request: Request):
     Returns:
         PredictionProbabilityResponse: Résultat avec probabilités.
     """
-    if predictor is None:
-        logger.error("Predictor non initialisé")
+    # Vérifier si le pool ou le predictor est disponible
+    if model_pool is None and predictor is None:
+        logger.error("Ni pool ni predictor initialisés")
         raise HTTPException(
             status_code=500,
             detail="Le modèle n'est pas chargé"
@@ -333,15 +397,41 @@ async def predict_proba(patient: PatientData, request: Request):
         # Convertir les données Pydantic en dict
         patient_dict = patient.model_dump(by_alias=True)
 
-        # Profiler la prédiction si le monitoring est activé
-        with performance_monitor.profile():
-            # Effectuer la prédiction avec probabilités
-            probabilities = predictor.predict_proba(patient_dict)
-            proba_list = probabilities[0].tolist()
+        # Mode pool (parallèle) - préféré
+        if model_pool and model_pool.is_initialized():
+            # Utiliser le context manager pour acquérir/libérer le modèle
+            async with ModelContextManager() as model_instance:
+                # Profiler la prédiction si le monitoring est activé
+                with performance_monitor.profile():
+                    # Préparer les données avec feature engineering
+                    processed_data = feature_engineer.engineer_features(
+                        patient_dict
+                    )
 
-            # Obtenir la prédiction
-            prediction = predictor.predict(patient_dict)
-            pred_value = int(prediction[0])
+                    # Réordonner les colonnes si nécessaire
+                    if hasattr(model_instance.model, 'feature_names_in_'):
+                        processed_data = processed_data[
+                            model_instance.model.feature_names_in_
+                        ]
+
+                    # Effectuer la prédiction avec probabilités
+                    probabilities = model_instance.predict_proba(processed_data)
+                    proba_list = probabilities[0].tolist()
+
+                    # Obtenir la prédiction
+                    prediction = model_instance.predict(processed_data)
+                    pred_value = int(prediction[0])
+
+        # Mode singleton (fallback)
+        else:
+            with performance_monitor.profile():
+                # Effectuer la prédiction avec probabilités
+                probabilities = predictor.predict_proba(patient_dict)
+                proba_list = probabilities[0].tolist()
+
+                # Obtenir la prédiction
+                prediction = predictor.predict(patient_dict)
+                pred_value = int(prediction[0])
 
         # Récupérer le transaction_id si disponible
         transaction_id = getattr(request.state, 'transaction_id', None)
@@ -367,6 +457,27 @@ async def predict_proba(patient: PatientData, request: Request):
         error_msg = f"Erreur lors de la prédiction : {str(e)}"
         logger.error(f"{error_msg} (patient age={patient.AGE})")
         raise HTTPException(status_code=500, detail=error_msg) from e
+
+
+@app.get("/pool/stats", tags=["Pool"])
+async def get_pool_stats():
+    """
+    Récupère les statistiques du pool de modèles.
+
+    Returns:
+        dict: Statistiques du pool (taille, utilisation, etc.).
+    """
+    if model_pool and model_pool.is_initialized():
+        stats = model_pool.get_stats()
+        return {
+            "pool_enabled": True,
+            "stats": stats
+        }
+    else:
+        return {
+            "pool_enabled": False,
+            "message": "Pool non initialisé (mode singleton actif)"
+        }
 
 
 @app.get("/logs", response_model=LogsResponse, tags=["Logs"])
