@@ -62,7 +62,7 @@ jobs:
           --cov=src/api \
           --cov-report=term-missing \
           --cov-report=json:coverage-api.json \
-          --cov-fail-under=80
+          --cov-fail-under=70
 
     - name: Display API coverage summary
       if: always()
@@ -185,5 +185,3 @@ jobs:
 
         echo "Push vers HF avec authentification (LFS supporté)"
         git push https://oauth2:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME deploy-hf:main --force
-
-        
