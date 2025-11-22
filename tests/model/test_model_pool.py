@@ -6,7 +6,6 @@ des prédictions.
 """
 
 import pickle
-from unittest.mock import MagicMock
 
 import pytest
 

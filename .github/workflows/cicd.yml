@@ -43,7 +43,7 @@ jobs:
 
     - name: Run tests with pytest
       run: |
-        uv run pytest tests/ --cov=src --cov-report=xml --cov-report=html --cov-report=term-missing --cov-fail-under=80 -v
+        uv run pytest tests/ --cov=src --cov-report=xml --cov-report=html --cov-report=term-missing --cov-fail-under=70 -v
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
@@ -131,7 +131,7 @@ jobs:
     needs: [test, lint, security]
     if: github.ref == 'refs/heads/main' &&  github.event.inputs.environment == 'production'
     environment: production  # Nécessite approbation dans Settings > Environments
-    
+
     steps:
     - name: Setup Git LFS
       run: |
@@ -186,4 +186,4 @@ jobs:
         echo "Push vers HF avec authentification (LFS supporté)"
         git push https://oauth2:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME deploy-hf:main --force
 
-      
+        

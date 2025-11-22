@@ -43,8 +43,8 @@ Ce document décrit l'architecture technique complète du projet, incluant les c
         ┌──────────────────┼──────────────────┐
         ↓                  ↓                  ↓
 ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│ Redis Cache  │   │  ML Model    │   │  Monitoring  │
-│ (Port 6379)  │   │  (Singleton) │   │  (cProfile)  │
+│ Redis Cache  │   │  Model Pool  │   │  Monitoring  │
+│ (Port 6379)  │   │ (4 instances)│   │  (cProfile)  │
 └──────────────┘   └──────────────┘   └──────────────┘
         │
         ↓
@@ -148,6 +148,7 @@ curl/HTTP → /api/predict → API Proxy → API FastAPI (8000) → Résultat JS
 | `/logs` | GET | Récupération des logs | [API_DOCUMENTATION.md](API_DOCUMENTATION.md) |
 | `/logs` | DELETE | Suppression des logs Redis | [CLEAR_LOGS_ENDPOINT.md](CLEAR_LOGS_ENDPOINT.md) |
 | `/logs/stats` | GET | Statistiques des logs | [API_DOCUMENTATION.md](API_DOCUMENTATION.md) |
+| `/pool/stats` | GET | Statistiques du pool de modèles | Section 3.5 ci-dessous |
 
 **Middlewares** :
 - CORS (toutes origines en développement)
@@ -158,6 +159,7 @@ curl/HTTP → /api/predict → API Proxy → API FastAPI (8000) → Résultat JS
 ```python
 # Variables d'environnement (.env)
 MODEL_PATH=./model/model.pkl
+MODEL_POOL_SIZE=4                    # Nombre d'instances du modèle
 API_HOST=0.0.0.0
 API_PORT=8000
 REDIS_HOST=localhost
@@ -174,22 +176,10 @@ ENABLE_PERFORMANCE_MONITORING=true
 
 **Architecture** :
 ```
-model_loader.py    → Singleton pattern pour chargement unique
-predictor.py       → Orchestration prédiction + feature engineering
+model_loader.py        → Singleton pattern pour chargement unique (mode legacy)
+model_pool.py          → Pool de modèles pour parallélisme (mode actif)
+predictor.py           → Orchestration prédiction + feature engineering
 feature_engineering.py → Calcul des 14 features dérivées
-```
-
-**Pattern Singleton** :
-```python
-class ModelLoader:
-    _instance = None
-    _model = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._load_model()
-        return cls._instance
 ```
 
 **Features** :
@@ -202,14 +192,189 @@ class ModelLoader:
 
 Détails : [FEATURE_ENGINEERING.md](FEATURE_ENGINEERING.md)
 
-**Processus de prédiction** :
+### 3.5. Model Pool (Parallélisme)
+
+**Fichier** : `src/model/model_pool.py`
+
+**Objectif** : Permettre le traitement parallèle de plusieurs requêtes de prédiction en maintenant plusieurs instances du modèle ML en mémoire.
+
+**Architecture du Pool** :
+
 ```
-Input (14 features)
-    → Feature Engineering (+ 14 features)
-    → Total (28 features)
-    → Model.predict()
-    → Prédiction (0/1) + Probabilité
+┌─────────────────────────────────────────────────────────┐
+│                    ModelPool (Singleton)                │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │         Queue (Thread-safe)                      │  │
+│  │  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐│  │
+│  │  │Model #0│  │Model #1│  │Model #2│  │Model #3││  │
+│  │  └────────┘  └────────┘  └────────┘  └────────┘│  │
+│  └──────────────────────────────────────────────────┘  │
+│                                                         │
+│  Methods:                                               │
+│  • initialize(pool_size, model_path)                    │
+│  • acquire(timeout) → ModelInstance                     │
+│  • acquire_async(timeout) → ModelInstance               │
+│  • release(instance)                                    │
+│  • get_stats() → dict                                   │
+└─────────────────────────────────────────────────────────┘
+           ↓                                ↓
+┌──────────────────────┐       ┌──────────────────────┐
+│  ModelInstance #0    │       │  ModelInstance #N    │
+│  • model (copy)      │       │  • model (copy)      │
+│  • instance_id       │       │  • instance_id       │
+│  • lock (thread)     │       │  • lock (thread)     │
+│  • usage_count       │       │  • usage_count       │
+│  • predict()         │       │  • predict()         │
+│  • predict_proba()   │       │  • predict_proba()   │
+└──────────────────────┘       └──────────────────────┘
 ```
+
+**Patterns utilisés** :
+
+1. **Object Pool Pattern** : Réutilisation d'instances pré-créées
+2. **Singleton Pattern** : Une seule instance du pool
+3. **Thread-Safety** : Lock par instance + Queue thread-safe
+4. **Async Context Manager** : Acquisition/libération automatique
+
+**Configuration** :
+
+```bash
+# .env
+MODEL_POOL_SIZE=4  # Nombre d'instances du modèle (défaut: 4)
+```
+
+**Initialisation au démarrage de l'API** :
+
+```python
+# src/api/main.py
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model_pool, feature_engineer
+
+    # Initialisation du pool
+    model_pool = ModelPool()
+    model_pool.initialize(
+        pool_size=settings.MODEL_POOL_SIZE,
+        model_path=settings.MODEL_PATH
+    )
+    feature_engineer = FeatureEngineer()
+
+    yield
+
+    # Affichage des stats au shutdown
+    stats = model_pool.get_stats()
+    logger.info(f"Statistiques du pool: {stats}")
+```
+
+**Utilisation dans les endpoints** :
+
+```python
+# Acquisition avec context manager (recommandé)
+async with ModelContextManager(timeout=30.0) as model_instance:
+    processed_data = feature_engineer.engineer_features(patient_dict)
+    prediction = model_instance.predict(processed_data)
+    proba = model_instance.predict_proba(processed_data)
+
+# L'instance est automatiquement libérée après le bloc
+```
+
+**Mécanisme de copie des modèles** :
+
+Les instances sont créées via `pickle.loads(pickle.dumps(base_model))` :
+- Chaque instance est une copie profonde indépendante
+- Pas de partage de mémoire entre instances
+- Permet le vrai parallélisme (pas de GIL blocking)
+
+**Thread-Safety** :
+
+```python
+class ModelInstance:
+    def predict(self, data):
+        with self.lock:  # Acquisition du lock thread
+            self.usage_count += 1
+            return self.model.predict(data)
+```
+
+**Endpoint de monitoring** :
+
+```bash
+GET /pool/stats
+
+Response:
+{
+  "pool_enabled": true,
+  "stats": {
+    "pool_size": 4,
+    "available": 3,
+    "in_use": 1,
+    "total_predictions": 1523,
+    "avg_usage_per_instance": 380.75,
+    "model_path": "./model/model.pkl"
+  }
+}
+```
+
+**Métriques du pool** :
+
+| Métrique | Description |
+|----------|-------------|
+| `pool_size` | Nombre total d'instances |
+| `available` | Instances disponibles |
+| `in_use` | Instances en cours d'utilisation |
+| `total_predictions` | Total de prédictions effectuées |
+| `avg_usage_per_instance` | Moyenne d'utilisation par instance |
+
+**Fallback mode singleton** :
+
+Si l'initialisation du pool échoue, l'API bascule automatiquement en mode singleton :
+
+```python
+try:
+    model_pool.initialize()
+except Exception as e:
+    logger.error(f"Pool init failed: {e}")
+    # Fallback to singleton
+    model_loader = ModelLoader()
+    predictor = Predictor()
+```
+
+**Avantages du pool** :
+
+| Avant (Singleton) | Après (Pool) |
+|-------------------|--------------|
+| ❌ 1 seule requête à la fois | ✅ 4 requêtes simultanées (configurable) |
+| ❌ Latence élevée sous charge | ✅ Latence optimisée |
+| ❌ Throughput limité | ✅ Throughput x4 |
+| ⚠️ GIL blocking | ✅ Vrai parallélisme |
+
+**Tests** :
+
+- Couverture : 90.99% (111 lignes, 10 lignes non couvertes)
+- Tests unitaires : `tests/model/test_model_pool.py` (18 tests)
+- Tests de charge : `make simulate-load` (1000 requêtes)
+
+**Processus de prédiction avec pool** :
+```
+HTTP Request → FastAPI Endpoint
+    ↓
+async with ModelContextManager() as instance
+    ↓
+Pool.acquire_async(timeout=30.0)
+    ↓
+Queue.get() → ModelInstance disponible
+    ↓
+Feature Engineering (14 → 28 features)
+    ↓
+ModelInstance.predict(data)  [avec lock thread]
+    ↓
+Pool.release(instance)
+    ↓
+HTTP Response
+```
+
+**Temps de réponse typique** : 20-60ms (avec pool actif)
 
 ### 4. Cache Redis
 
@@ -768,7 +933,7 @@ services:
 
 ### Métriques collectées
 
-**8 métriques principales** :
+**8 métriques principales de performance** :
 
 1. **transaction_id** : UUID unique
 2. **inference_time_ms** : Temps d'inférence ML
@@ -778,6 +943,14 @@ services:
 6. **function_calls** : Nombre d'appels
 7. **latency_ms** : Latence totale
 8. **top_functions** : Top 5 fonctions coûteuses
+
+**5 métriques du pool de modèles** :
+
+1. **pool_size** : Nombre total d'instances
+2. **available** : Instances disponibles
+3. **in_use** : Instances en cours d'utilisation
+4. **total_predictions** : Total de prédictions
+5. **avg_usage_per_instance** : Moyenne d'utilisation
 
 Documentation complète : [PERFORMANCE_METRICS.md](PERFORMANCE_METRICS.md)
 
@@ -871,9 +1044,11 @@ app.add_middleware(
 
 **Optimisations** :
 
-1. **Cache modèle** :
-   - Modèle chargé une fois (Singleton) ✅
+1. **Model Pool** :
+   - Pool de 4 instances du modèle (configurable) ✅
+   - Traitement parallèle de 4 requêtes simultanées
    - Pas de rechargement à chaque requête
+   - Fallback automatique vers mode Singleton
 
 2. **Connection pooling** :
    - Redis connection pool
@@ -886,6 +1061,7 @@ app.add_middleware(
 4. **Async endpoints** :
    - FastAPI async/await
    - Non-blocking I/O
+   - Context manager async pour le pool
 
 ## Configuration
 
@@ -902,6 +1078,7 @@ API_PORT=8000
 
 # Modèle
 MODEL_PATH=./model/model.pkl
+MODEL_POOL_SIZE=4                    # Nombre d'instances pour le parallélisme
 
 # Redis
 REDIS_HOST=localhost
@@ -1026,11 +1203,21 @@ make simulate-drift     # Simulation avec drift de données
 
 ---
 
-**Version** : 2.0.0
-**Dernière mise à jour** : 21 janvier 2025
+**Version** : 2.1.0
+**Dernière mise à jour** : 22 novembre 2025
 **Projet** : OpenClassrooms MLOps - Projet 8
 
 ### Changelog
+
+**Version 2.1.0** (22 novembre 2025):
+- ✅ Ajout Model Pool pour parallélisme (4 instances configurables)
+- ✅ Endpoint `/pool/stats` pour monitoring du pool
+- ✅ Context manager async pour acquisition/libération automatique
+- ✅ Thread-safety avec lock par instance
+- ✅ Fallback automatique vers mode Singleton
+- ✅ Tests unitaires complets (90.99% coverage)
+- ✅ Configuration `MODEL_POOL_SIZE` dans .env
+- ✅ Documentation complète dans ARCHITECTURE.md
 
 **Version 2.0.0** (21 janvier 2025):
 - ✅ Ajout architecture hybride FastAPI+Gradio pour HuggingFace Spaces
