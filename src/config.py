@@ -19,6 +19,7 @@ class Settings:
 
     # Configuration du modèle ML
     MODEL_PATH: str = os.getenv("MODEL_PATH", "./model/model.pkl")
+    MODEL_POOL_SIZE: int = int(os.getenv("MODEL_POOL_SIZE", "4"))
 
     # Configuration de l'API FastAPI
     API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
