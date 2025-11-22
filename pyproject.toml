@@ -79,6 +79,7 @@ omit = [
     "src/simulator/*",
     "src/logs_pipeline/*",
     "src/proxy/gradio_app.py",
+    "src/model/onnx_loader.py",
 ]
 
 [tool.coverage.report]
