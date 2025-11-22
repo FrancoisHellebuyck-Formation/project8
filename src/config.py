@@ -19,7 +19,13 @@ class Settings:
 
     # Configuration du modèle ML
     MODEL_PATH: str = os.getenv("MODEL_PATH", "./model/model.pkl")
+    ONNX_MODEL_PATH: str = os.getenv("ONNX_MODEL_PATH", "./model/model.onnx")
     MODEL_POOL_SIZE: int = int(os.getenv("MODEL_POOL_SIZE", "4"))
+    ONNX_POOL_SIZE: int = int(os.getenv("ONNX_POOL_SIZE", "4"))
+    ENABLE_ONNX: bool = os.getenv(
+        "ENABLE_ONNX", "true"
+    ).lower() in ("true", "1", "yes")
+    DEFAULT_MODEL_TYPE: str = os.getenv("DEFAULT_MODEL_TYPE", "sklearn")
 
     # Configuration de l'API FastAPI
     API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
