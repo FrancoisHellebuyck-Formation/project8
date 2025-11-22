@@ -216,6 +216,7 @@ async def log_requests(request: Request, call_next):
 
                 # Réinjecter le body pour que l'endpoint puisse le lire
                 async def receive():
+                    """Réinjecte le body de la requête pour lecture ultérieure."""
                     return {"type": "http.request", "body": body_bytes}
 
                 request._receive = receive
