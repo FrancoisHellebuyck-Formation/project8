@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-ui-fastapi run-redis stop-redis docker-build docker-up docker-down docker-logs logs clear-logs logs-gradio-local logs-gradio-hf health predict-test pipeline-check pipeline-once pipeline-continuous pipeline-elasticsearch-up pipeline-elasticsearch-down simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze docs docs-clean docs-open
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-ui-fastapi run-api-ui stop-api-ui run-redis stop-redis docker-build docker-up docker-down docker-logs logs clear-logs logs-gradio-local logs-gradio-hf health predict-test pipeline-check pipeline-once pipeline-continuous pipeline-elasticsearch-up pipeline-elasticsearch-down simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze docs docs-clean docs-open
 
 # Variables
 PYTHON := python
@@ -49,6 +49,8 @@ help:
 	@echo "  make run-api          - Lance l'API FastAPI (port 8000)"
 	@echo "  make run-ui           - Lance l'interface Gradio simple (port 7860)"
 	@echo "  make run-ui-fastapi   - Lance FastAPI+Gradio hybride (port 7860, avec /api/*)"
+	@echo "  make run-api-ui       - Lance API + UI en background"
+	@echo "  make stop-api-ui      - Arrête API + UI lancés en background"
 	@echo "  make run-proxy        - Lance l'interface proxy (tous endpoints)"
 	@echo "  make run-redis        - Lance Redis avec Docker"
 	@echo "  make stop-redis       - Arrête le conteneur Redis"
@@ -283,6 +285,57 @@ run-ui-fastapi:
 	@echo "  - GET  /api/logs"
 	@echo "  - DELETE /api/logs"
 	@$(VENV_BIN)/python -m src.ui.fastapi_app
+
+## run-api-ui: Lance l'API et l'UI en background
+run-api-ui:
+	@echo "$(BLUE)Démarrage de l'API et l'UI en background...$(NC)"
+	@echo "$(YELLOW)Lancement de l'API FastAPI sur le port $(API_PORT)...$(NC)"
+	@$(UV) run uvicorn src.api.main:app --host $(API_HOST) --port $(API_PORT) \
+		> /tmp/ml-api.log 2>&1 & echo $$! > /tmp/ml-api.pid
+	@sleep 3
+	@if curl -s http://localhost:$(API_PORT)/health > /dev/null; then \
+		echo "$(GREEN)✓ API démarrée avec succès (PID: $$(cat /tmp/ml-api.pid))$(NC)"; \
+	else \
+		echo "$(RED)✗ Échec du démarrage de l'API$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Lancement de l'UI Gradio sur le port $(GRADIO_PORT)...$(NC)"
+	@$(UV) run python -m src.ui.fastapi_app \
+		> /tmp/ml-ui.log 2>&1 & echo $$! > /tmp/ml-ui.pid
+	@sleep 3
+	@echo "$(GREEN)✓ UI démarrée avec succès (PID: $$(cat /tmp/ml-ui.pid))$(NC)"
+	@echo ""
+	@echo "$(GREEN)Services démarrés:$(NC)"
+	@echo "  $(YELLOW)API:$(NC)  http://$(API_HOST):$(API_PORT) (PID: $$(cat /tmp/ml-api.pid))"
+	@echo "  $(YELLOW)Docs:$(NC) http://$(API_HOST):$(API_PORT)/docs"
+	@echo "  $(YELLOW)UI:$(NC)   http://$(GRADIO_HOST):$(GRADIO_PORT) (PID: $$(cat /tmp/ml-ui.pid))"
+	@echo ""
+	@echo "$(YELLOW)Logs disponibles:$(NC)"
+	@echo "  API: tail -f /tmp/ml-api.log"
+	@echo "  UI:  tail -f /tmp/ml-ui.log"
+	@echo ""
+	@echo "$(YELLOW)Pour arrêter:$(NC) make stop-api-ui"
+
+## stop-api-ui: Arrête l'API et l'UI lancés en background
+stop-api-ui:
+	@echo "$(BLUE)Arrêt de l'API et l'UI...$(NC)"
+	@if [ -f /tmp/ml-api.pid ]; then \
+		echo "$(YELLOW)Arrêt de l'API (PID: $$(cat /tmp/ml-api.pid))...$(NC)"; \
+		kill $$(cat /tmp/ml-api.pid) 2>/dev/null || true; \
+		rm /tmp/ml-api.pid; \
+		echo "$(GREEN)✓ API arrêtée$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠ Pas de PID trouvé pour l'API$(NC)"; \
+	fi
+	@if [ -f /tmp/ml-ui.pid ]; then \
+		echo "$(YELLOW)Arrêt de l'UI (PID: $$(cat /tmp/ml-ui.pid))...$(NC)"; \
+		kill $$(cat /tmp/ml-ui.pid) 2>/dev/null || true; \
+		rm /tmp/ml-ui.pid; \
+		echo "$(GREEN)✓ UI arrêtée$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠ Pas de PID trouvé pour l'UI$(NC)"; \
+	fi
+	@echo "$(GREEN)✓ Services arrêtés$(NC)"
 
 ## run-redis: Lance Redis avec Docker
 run-redis:

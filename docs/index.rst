@@ -16,14 +16,37 @@ Ce projet est une infrastructure MLOps complète incluant :
    :maxdepth: 2
    :caption: Contenu:
 
+   readme
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Modules API:
+
    modules/api
    modules/model
    modules/ui
    modules/simulator
    modules/logs_pipeline
 
-Architecture
-------------
+.. toctree::
+   :maxdepth: 2
+   :caption: Guides et Documentation:
+
+   guides/docker
+   guides/scripts
+   guides/model
+   guides/proxy
+   guides/jmeter
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Architecture:
+
+   architecture/architecture
+   architecture/pipeline
+
+Vue d'ensemble de l'Architecture
+---------------------------------
 
 Le projet est organisé en plusieurs modules :
 

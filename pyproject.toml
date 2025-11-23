@@ -29,6 +29,8 @@ dependencies = [
     "sphinx>=8.2.3",
     "sphinx-rtd-theme>=3.0.2",
     "sphinx-autodoc-typehints>=3.5.2",
+    "myst-parser>=4.0.1",
+    "onnxmltools>=1.14.0",
 ]
 
 [tool.flake8]
@@ -64,6 +66,7 @@ dev = [
     "pre-commit>=4.4.0",
     "bandit>=1.9.1",
     "safety>=3.7.0",
+    "skl2onnx>=1.19.1",
 ]
 
 [tool.pytest.ini_options]

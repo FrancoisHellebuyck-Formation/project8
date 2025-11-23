@@ -293,16 +293,21 @@ class ModelContextManager:
             predictions = model_instance.predict(data)
     """
 
-    def __init__(self, timeout: float = 30.0):
+    def __init__(
+        self,
+        pool: Optional['ModelPool'] = None,
+        timeout: float = 30.0
+    ):
         """
         Initialise le context manager.
 
         Args:
+            pool: Instance du pool à utiliser. Si None, utilise le Singleton.
             timeout: Temps d'attente maximum pour acquérir une instance.
         """
         self.timeout = timeout
         self.instance: Optional[ModelInstance] = None
-        self.pool = ModelPool()
+        self.pool = pool if pool is not None else ModelPool()
 
     async def __aenter__(self) -> ModelInstance:
         """
