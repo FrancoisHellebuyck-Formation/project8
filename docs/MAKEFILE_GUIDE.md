@@ -484,7 +484,7 @@ Vérifiez que :
 ## Aide supplémentaire
 
 Pour toute question, consultez :
-- [CLAUDE.md](CLAUDE.md) - Règles de développement
+- [GEMINI.md](../GEMINI.md) - Règles de développement
 - [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Documentation de l'API
 - [FEATURE_ENGINEERING.md](FEATURE_ENGINEERING.md) - Feature engineering
 - [ENV_VARIABLES.md](ENV_VARIABLES.md) - Variables d'environnement

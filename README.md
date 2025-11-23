@@ -312,7 +312,7 @@ https://francoisformation-oc-project8.hf.space/
 ## 📚 Documentation
 
 ### Documentation principale
-- [CLAUDE.md](CLAUDE.md) - Règles de développement et architecture
+- [GEMINI.md](GEMINI.md) - Règles de développement et architecture
 - [README.md](README.md) - Ce fichier
 
 ### Documentation technique (dossier docs/)
