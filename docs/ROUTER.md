@@ -47,3 +47,85 @@ Le `ModelRouter` permet également de récupérer des statistiques sur l'état d
 ## Intégration
 
 Le `ModelRouter` est initialisé et configuré au démarrage de l'application FastAPI, comme illustré dans la fonction `lifespan` de `src/api/main.py`. Il est ensuite utilisé par les endpoints `/predict` et `/predict_proba` pour acheminer les requêtes vers le bon modèle.
+
+## Exemples d'utilisation avec cURL
+
+Voici des exemples de requêtes `curl` pour interroger l'API en spécifiant le type de modèle. Remplacez `http://localhost:8000` par l'URL de votre API si elle est déployée ailleurs.
+
+### Prédiction avec le modèle scikit-learn
+
+Pour forcer l'utilisation du modèle `scikit-learn`, utilisez le paramètre `model_type=sklearn`.
+
+```bash
+curl -X POST "http://localhost:8000/predict?model_type=sklearn" \
+-H "Content-Type: application/json" \
+-d '{
+    "AGE": 65,
+    "GENDER": 1,
+    "SMOKING": 1,
+    "ALCOHOL CONSUMING": 1,
+    "PEER_PRESSURE": 0,
+    "YELLOW_FINGERS": 1,
+    "ANXIETY": 0,
+    "FATIGUE": 1,
+    "ALLERGY": 0,
+    "WHEEZING": 1,
+    "COUGHING": 1,
+    "SHORTNESS OF BREATH": 1,
+    "SWALLOWING DIFFICULTY": 0,
+    "CHEST PAIN": 1,
+    "CHRONIC DISEASE": 0
+}'
+```
+
+### Prédiction avec le modèle ONNX
+
+Pour forcer l'utilisation du modèle `ONNX`, utilisez le paramètre `model_type=onnx`.
+
+```bash
+curl -X POST "http://localhost:8000/predict?model_type=onnx" \
+-H "Content-Type: application/json" \
+-d '{
+    "AGE": 65,
+    "GENDER": 1,
+    "SMOKING": 1,
+    "ALCOHOL CONSUMING": 1,
+    "PEER_PRESSURE": 0,
+    "YELLOW_FINGERS": 1,
+    "ANXIETY": 0,
+    "FATIGUE": 1,
+    "ALLERGY": 0,
+    "WHEEZING": 1,
+    "COUGHING": 1,
+    "SHORTNESS OF BREATH": 1,
+    "SWALLOWING DIFFICULTY": 0,
+    "CHEST PAIN": 1,
+    "CHRONIC DISEASE": 0
+}'
+```
+
+### Prédiction avec le modèle par défaut
+
+Si le paramètre `model_type` est omis, le `ModelRouter` utilisera le modèle configuré par défaut.
+
+```bash
+curl -X POST "http://localhost:8000/predict" \
+-H "Content-Type: application/json" \
+-d '{
+    "AGE": 65,
+    "GENDER": 1,
+    "SMOKING": 1,
+    "ALCOHOL CONSUMING": 1,
+    "PEER_PRESSURE": 0,
+    "YELLOW_FINGERS": 1,
+    "ANXIETY": 0,
+    "FATIGUE": 1,
+    "ALLERGY": 0,
+    "WHEEZING": 1,
+    "COUGHING": 1,
+    "SHORTNESS OF BREATH": 1,
+    "SWALLOWING DIFFICULTY": 0,
+    "CHEST PAIN": 1,
+    "CHRONIC DISEASE": 0
+}'
+```
