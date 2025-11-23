@@ -229,6 +229,9 @@ jobs:
         git lfs track "*.pkl"
         git lfs track "*.onnx"
         
+        # Add .gitattributes to stage before adding other files to ensure LFS tracking is active
+        git add .gitattributes
+        
         echo "Copier le Dockerfile pour HF Spaces (API + UI Gradio + Redis)"
         cp docker/Dockerfile.hf Dockerfile
 
