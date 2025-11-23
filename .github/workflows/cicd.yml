@@ -246,6 +246,14 @@ jobs:
         git rm -rf docker 2>/dev/null || true
         git rm -f docker-compose.yml 2>/dev/null || true
 
+        echo "--- DEBUGGING: Listing all files ---"
+        ls -R
+        echo "--- DEBUGGING: cat .gitattributes ---"
+        cat .gitattributes
+        echo "--- DEBUGGING: cat .gitignore ---"
+        cat .gitignore
+        echo "--- END DEBUGGING ---"
+
         echo "Ajouter tous les fichiers nécessaires (y compris LFS)"
         git add -A
         git commit -m "Deploy to HuggingFace Spaces: API FastAPI + UI Gradio"
