@@ -1110,7 +1110,7 @@ HF_TOKEN=hf_xxxxx
 | `pyproject.toml` | Dépendances Python |
 | `docker-compose.yml` | Infrastructure Docker |
 | `.flake8` | Configuration linting |
-| `CLAUDE.md` | Règles de développement |
+| `GEMINI.md` | Règles de développement |
 
 ## Commandes utiles
 
@@ -1184,7 +1184,7 @@ make simulate-drift     # Simulation avec drift de données
 
 ### Documentation générale
 - [README.md](../README.md) - Documentation principale
-- [CLAUDE.md](../CLAUDE.md) - Règles de développement
+- [GEMINI.md](../GEMINI.md) - Règles de développement
 - [MAKEFILE_GUIDE.md](MAKEFILE_GUIDE.md) - Guide Makefile complet
 
 ### API et déploiement
