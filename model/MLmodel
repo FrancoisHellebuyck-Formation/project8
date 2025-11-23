@@ -1,4 +1,4 @@
-artifact_path: mlflow-artifacts:/5/models/m-66de4e6efe434c53a5c8d2abcda6bcf8/artifacts
+artifact_path: mlflow-artifacts:/5/models/m-08c6788575b744d3a34221cad4d9111a/artifacts
 flavors:
   python_function:
     env:
@@ -19,15 +19,15 @@ metadata:
   description: "Mod\xE8le final optimis\xE9 pour la d\xE9tection de cancer"
   model_type: LightGBM
   optimization: GridSearch + Threshold
-  pipeline: SMOTE + StandardScaler + LightGBM
+  pipeline: StandardScaler + LightGBM
   status: production_ready
   threshold_optimized: 'yes'
 mlflow_version: 3.4.0
-model_id: m-66de4e6efe434c53a5c8d2abcda6bcf8
-model_size_bytes: 684737
-model_uuid: m-66de4e6efe434c53a5c8d2abcda6bcf8
+model_id: m-08c6788575b744d3a34221cad4d9111a
+model_size_bytes: 357515
+model_uuid: m-08c6788575b744d3a34221cad4d9111a
 prompts: null
-run_id: 5668400c34af460a90e764b10a96a9f2
+run_id: d6d56107f53c4100b76dd8ca64a557a9
 saved_input_example_info:
   artifact_path: input_example.json
   pandas_orient: split
@@ -59,4 +59,4 @@ signature:
   outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float64", "shape": [-1]}}]'
   params: null
 type_hint_from_example: false
-utc_time_created: '2025-11-19 10:25:56.226648'
+utc_time_created: '2025-11-23 14:57:19.610619'
