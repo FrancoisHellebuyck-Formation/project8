@@ -3,8 +3,17 @@ Simulator Module
 
 Module de simulation de charge et de data drift.
 
+Documentation du module
+-----------------------
+
+.. include:: ../../src/simulator/README.md
+   :parser: myst_parser.sphinx_
+
+API Reference
+-------------
+
 Simulator
----------
+~~~~~~~~~
 
 .. automodule:: simulator.simulator
    :members:
@@ -12,7 +21,7 @@ Simulator
    :show-inheritance:
 
 Drift Analyzer
---------------
+~~~~~~~~~~~~~~
 
 .. automodule:: simulator.drift_analyzer
    :members:
