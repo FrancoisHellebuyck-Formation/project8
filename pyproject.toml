@@ -26,6 +26,9 @@ dependencies = [
     "scipy==1.16.2",
     "setuptools>=69.0.0",
     "uvicorn[standard]>=0.30.0",
+    "sphinx>=8.2.3",
+    "sphinx-rtd-theme>=3.0.2",
+    "sphinx-autodoc-typehints>=3.5.2",
 ]
 
 [tool.flake8]
@@ -79,6 +82,7 @@ omit = [
     "src/simulator/*",
     "src/logs_pipeline/*",
     "src/proxy/gradio_app.py",
+    "src/model/onnx_loader.py",
 ]
 
 [tool.coverage.report]

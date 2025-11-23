@@ -1,7 +1,7 @@
 # Makefile pour le projet ML API
 # Commandes pour faciliter le développement, les tests et le déploiement
 
-.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-ui-fastapi run-redis stop-redis docker-build docker-up docker-down docker-logs logs clear-logs logs-gradio-local logs-gradio-hf health predict-test pipeline-check pipeline-once pipeline-continuous pipeline-elasticsearch-up pipeline-elasticsearch-down simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze
+.PHONY: help install install-dev clean lint format test test-coverage test-api test-model test-gradio-api test-gradio-api-local test-gradio-api-hf run-api run-ui run-ui-fastapi run-redis stop-redis docker-build docker-up docker-down docker-logs logs clear-logs logs-gradio-local logs-gradio-hf health predict-test pipeline-check pipeline-once pipeline-continuous pipeline-elasticsearch-up pipeline-elasticsearch-down simulate simulate-quick simulate-load simulate-drift simulate-drift-progressive simulate-gradio-local simulate-gradio-hf simulate-gradio-drift-local simulate-gradio-drift-hf simulate-gradio-drift-progressive-hf drift-analyze docs docs-clean docs-open
 
 # Variables
 PYTHON := python
@@ -99,6 +99,11 @@ help:
 	@echo "$(GREEN)Migration ONNX:$(NC)"
 	@echo "  make convert-onnx     - Convertit le modèle en ONNX (avec validation)"
 	@echo "  make convert-onnx-quick - Conversion ONNX rapide (sans validation)"
+	@echo ""
+	@echo "$(GREEN)Documentation:$(NC)"
+	@echo "  make docs             - Génère la documentation Sphinx"
+	@echo "  make docs-clean       - Nettoie et régénère la documentation"
+	@echo "  make docs-open        - Génère et ouvre la documentation"
 	@echo ""
 
 ## install: Installe les dépendances de production
@@ -618,6 +623,26 @@ convert-onnx-quick:
 	@echo "$(BLUE)Conversion rapide en ONNX...$(NC)"
 	$(PYTHON) scripts/convert_to_onnx.py
 	@echo "$(GREEN)✓ Conversion terminée$(NC)"
+
+## docs: Génère la documentation Sphinx
+docs:
+	@echo "$(BLUE)Génération de la documentation Sphinx...$(NC)"
+	@$(UV) run python scripts/generate_docs.py
+	@echo "$(GREEN)✓ Documentation générée$(NC)"
+	@echo "$(YELLOW)📖 Ouvrir: docs/_build/html/index.html$(NC)"
+
+## docs-clean: Nettoie et régénère la documentation
+docs-clean:
+	@echo "$(BLUE)Nettoyage et régénération de la documentation...$(NC)"
+	@$(UV) run python scripts/generate_docs.py --clean
+	@echo "$(GREEN)✓ Documentation nettoyée et régénérée$(NC)"
+	@echo "$(YELLOW)📖 Ouvrir: docs/_build/html/index.html$(NC)"
+
+## docs-open: Génère et ouvre la documentation dans le navigateur
+docs-open:
+	@echo "$(BLUE)Génération de la documentation...$(NC)"
+	@$(UV) run python scripts/generate_docs.py --open
+	@echo "$(GREEN)✓ Documentation ouverte dans le navigateur$(NC)"
 
 # Cibles par défaut
 .DEFAULT_GOAL := help
