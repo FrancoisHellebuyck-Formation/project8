@@ -38,8 +38,15 @@ Ce projet est une infrastructure MLOps complète incluant :
    guides/proxy
    guides/jmeter
 
-Architecture
-------------
+.. toctree::
+   :maxdepth: 2
+   :caption: Architecture:
+
+   architecture/architecture
+   architecture/pipeline
+
+Vue d'ensemble de l'Architecture
+---------------------------------
 
 Le projet est organisé en plusieurs modules :
 
