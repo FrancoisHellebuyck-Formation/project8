@@ -104,74 +104,73 @@ class ModelPool:
         self._initialized = True
 
     def initialize(
-        self, pool_size: Optional[int] = None, model_path: Optional[str] = None
+        self,
+        pool_size: Optional[int] = None,
+        model_path: Optional[str] = None,
+        base_model: Optional[Any] = None,
     ) -> None:
         """
         Initialise le pool avec des instances de modèle.
 
         Args:
             pool_size: Nombre d'instances de modèle à créer.
-                      Si None, utilise MODEL_POOL_SIZE depuis config.
-            model_path: Chemin vers le fichier du modèle.
-                       Si None, utilise MODEL_PATH depuis config.
-
-        Raises:
-            FileNotFoundError: Si le fichier du modèle n'existe pas.
-            Exception: Si le chargement du modèle échoue.
+            model_path: Chemin du modèle (utilisé si base_model n'est pas fourni).
+            base_model: Modèle de base pré-chargé (optionnel).
         """
         if self._pool_size > 0:
             print(f"Pool déjà initialisé avec {self._pool_size} instances")
             return
 
-        # Déterminer la taille du pool
         if pool_size is None:
             pool_size = settings.MODEL_POOL_SIZE
         self._pool_size = pool_size
 
-        # Déterminer le chemin du modèle
-        if model_path is None:
-            model_path = Path(settings.MODEL_PATH)
-            if not model_path.is_absolute():
-                project_root = Path(__file__).parent.parent.parent
-                model_path = project_root / model_path
+        if base_model is None:
+            if model_path is None:
+                model_path = Path(settings.MODEL_PATH)
+                if not model_path.is_absolute():
+                    project_root = Path(__file__).parent.parent.parent
+                    model_path = project_root / model_path
+            else:
+                model_path = Path(model_path)
+
+            self._model_path = model_path
+
+            if not self._model_path.exists():
+                raise FileNotFoundError(
+                    f"Le fichier du modèle n'existe pas : {self._model_path}"
+                )
+
+            print(f"Chargement du modèle de base depuis {self._model_path}...")
+            try:
+                with open(self._model_path, "rb") as f:
+                    base_model = pickle.load(f)
+            except Exception as e:
+                raise Exception(
+                    f"Erreur chargement du modèle pickle : {str(e)}"
+                ) from e
         else:
-            model_path = Path(model_path)
-
-        self._model_path = model_path
-
-        if not model_path.exists():
-            raise FileNotFoundError(
-                f"Le fichier du modèle n'existe pas : {model_path}"
-            )
+            print("Utilisation du modèle de base pré-chargé.")
+            if model_path:
+                self._model_path = Path(model_path)
 
         print(f"Initialisation du pool de {pool_size} modèles...")
 
-        # Charger le modèle de base
-        try:
-            with open(model_path, "rb") as f:
-                base_model = pickle.load(f)
-            print(f"Modèle de base chargé depuis {model_path}")
-        except Exception as e:
-            raise Exception(
-                f"Erreur lors du chargement du modèle : {str(e)}"
-            ) from e
-
-        # Créer les instances du pool
         for i in range(pool_size):
-            # Créer une copie du modèle pour chaque instance
-            # Note: pour certains modèles, on pourrait utiliser
-            # sklearn.base.clone()
-            # mais pickle.loads(pickle.dumps()) est plus universel
             try:
+                # Tente de copier le modèle pour l'isolation
                 model_copy = pickle.loads(pickle.dumps(base_model))
                 instance = ModelInstance(model_copy, i)
                 self._model_instances.append(instance)
                 self._pool.put(instance)
-                print(f"  Instance {i} créée et ajoutée au pool")
-            except Exception as e:
-                raise Exception(
-                    f"Erreur lors de la création de l'instance {i}: {str(e)}"
-                ) from e
+                print(f"  Instance {i} créée (copie) et ajoutée au pool")
+            except Exception:
+                # Si le modèle n'est pas sérialisable (ex: ONNX),
+                # partage la même instance. ONNXRuntime est thread-safe.
+                instance = ModelInstance(base_model, i)
+                self._model_instances.append(instance)
+                self._pool.put(instance)
+                print(f"  Instance {i} créée (partagée) et ajoutée au pool")
 
         print(f"✅ Pool initialisé avec {pool_size} instances de modèle")
 
