@@ -698,5 +698,4 @@ mlflow.db.lock
 
 CLAUDE.md
 model/inference_dataset.parquet
-model/training_dataset.parquetmodel/model.onnx
-model/model.onnx
+model/training_dataset.parquet
