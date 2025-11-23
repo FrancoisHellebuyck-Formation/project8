@@ -180,6 +180,18 @@ jobs:
         fetch-depth: 0
         lfs: true
 
+    - name: Download ONNX model from test job
+      uses: actions/download-artifact@v4
+      with:
+        name: onnx-model
+        path: model
+
+    - name: Verify downloaded ONNX model
+      run: |
+        echo "🔎 Vérification du modèle ONNX téléchargé..."
+        ls -lh model/model.onnx
+        echo "✅ Modèle ONNX présent."
+
     - name: Pull LFS files
       run: git lfs pull
 
@@ -190,13 +202,6 @@ jobs:
 
     - name: Install dependencies
       run: uv sync
-
-    - name: Generate ONNX model for deployment
-      run: |
-        echo "🔄 Génération du modèle ONNX pour HuggingFace..."
-        uv run python scripts/convert_to_onnx.py
-        ls -lh model/model.onnx
-        echo "✅ Modèle ONNX prêt pour le déploiement"
 
     - name: Configure Git LFS for ONNX model
       run: |
