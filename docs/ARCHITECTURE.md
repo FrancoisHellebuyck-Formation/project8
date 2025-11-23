@@ -18,11 +18,7 @@ Ce document décrit l'architecture technique complète du projet, incluant les c
 
 ## Architecture globale
 
-```{image} projet8.drawio.svg
-:alt: Diagramme d'architecture du projet MLOps
-:align: center
-:width: 100%
-```
+![Diagramme d'architecture du projet MLOps](projet8.drawio.png)
 
 
 ## Composants principaux
