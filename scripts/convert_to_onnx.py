@@ -41,6 +41,32 @@ import numpy as np
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 
+# Register LightGBM converter if available
+try:
+    import lightgbm
+    from skl2onnx import update_registered_converter
+    from skl2onnx.common.shape_calculator import (
+        calculate_linear_classifier_output_shapes
+    )
+    from onnxmltools.convert.lightgbm.operator_converters.LightGbm import (
+        convert_lightgbm
+    )
+
+    # Register the LightGBM converter for sklearn-onnx
+    update_registered_converter(
+        lightgbm.LGBMClassifier,
+        'LightGbmLGBMClassifier',
+        calculate_linear_classifier_output_shapes,
+        convert_lightgbm,
+        options={'nocl': [True, False], 'zipmap': [True, False, 'columns']}
+    )
+    LIGHTGBM_AVAILABLE = True
+    print("✅ LightGBM converter enregistré")
+except ImportError as e:
+    LIGHTGBM_AVAILABLE = False
+    print(f"⚠️  Erreur d'import LightGBM converter: {e}")
+    print("   Installez avec: uv add onnxmltools")
+
 
 def load_pickle_model(model_path: str):
     """
@@ -108,6 +134,55 @@ def get_model_info(model) -> dict:
     return info
 
 
+def extract_inference_pipeline(model):
+    """
+    Extrait la partie du pipeline pertinente pour l'inférence.
+
+    SMOTE et autres techniques de sur-échantillonnage ne sont utilisées
+    qu'à l'entraînement, pas à l'inférence. On les retire du pipeline.
+
+    Args:
+        model: Le modèle (peut être un Pipeline ou un modèle simple)
+
+    Returns:
+        Le modèle d'inférence (sans SMOTE)
+    """
+    from sklearn.pipeline import Pipeline
+
+    # Si ce n'est pas un Pipeline, retourner tel quel
+    if not isinstance(model, Pipeline):
+        return model
+
+    # Identifier les étapes à garder (pas SMOTE)
+    inference_steps = []
+    smote_removed = False
+
+    for name, step in model.steps:
+        step_type = type(step).__name__
+        # Exclure SMOTE et autres techniques de sur-échantillonnage
+        if 'SMOTE' in step_type or 'Sampler' in step_type:
+            print(f"⚠️  Étape '{name}' ({step_type}) retirée "
+                  "(sur-échantillonnage uniquement pour l'entraînement)")
+            smote_removed = True
+            continue
+        inference_steps.append((name, step))
+
+    # Si des étapes ont été retirées, créer un nouveau pipeline
+    if smote_removed:
+        if len(inference_steps) == 1:
+            # Si une seule étape reste, retourner le modèle directement
+            print(f"   → Pipeline simplifié en: {inference_steps[0][1]}")
+            return inference_steps[0][1]
+        else:
+            # Créer un nouveau pipeline
+            new_pipeline = Pipeline(inference_steps)
+            print(f"   → Nouveau pipeline: "
+                  f"{' → '.join([name for name, _ in inference_steps])}")
+            return new_pipeline
+
+    return model
+
+
 def convert_to_onnx(
     model,
     n_features: int,
@@ -130,15 +205,18 @@ def convert_to_onnx(
     print(f"   - Nombre de features: {n_features}")
     print(f"   - Target opset: {target_opset}")
 
+    # Extraire le pipeline d'inférence (sans SMOTE)
+    inference_model = extract_inference_pipeline(model)
+
     # Définir le type d'entrée (tableau de floats)
     initial_type = [("float_input", FloatTensorType([None, n_features]))]
 
     # Convertir le modèle
     try:
         onnx_model = convert_sklearn(
-            model,
+            inference_model,
             initial_types=initial_type,
-            target_opset=target_opset,
+            target_opset={'': target_opset, 'ai.onnx.ml': 3},
             options={
                 "zipmap": False  # Désactiver zipmap pour predict_proba
             }
