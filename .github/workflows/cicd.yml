@@ -41,12 +41,19 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
-    # Note: ONNX conversion désactivée - support ONNX en préparation
-    # - name: Convert model to ONNX
-    #   run: |
-    #     echo "🔄 Conversion du modèle pickle vers ONNX..."
-    #     uv run python scripts/convert_to_onnx.py --validate
-    #     echo "✅ Modèle ONNX créé avec succès"
+    - name: Convert model to ONNX
+      run: |
+        echo "🔄 Conversion du modèle pickle vers ONNX..."
+        uv run python scripts/convert_to_onnx.py --validate
+        echo "✅ Modèle ONNX créé avec succès"
+        ls -lh model/model.onnx
+
+    - name: Upload ONNX model artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: onnx-model
+        path: model/model.onnx
+        retention-days: 30
 
     - name: Run tests with pytest
       run: |
@@ -175,6 +182,26 @@ jobs:
 
     - name: Pull LFS files
       run: git lfs pull
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Generate ONNX model for deployment
+      run: |
+        echo "🔄 Génération du modèle ONNX pour HuggingFace..."
+        uv run python scripts/convert_to_onnx.py
+        ls -lh model/model.onnx
+        echo "✅ Modèle ONNX prêt pour le déploiement"
+
+    - name: Configure Git LFS for ONNX model
+      run: |
+        git lfs track "*.onnx"
+        echo "*.onnx filter=lfs diff=lfs merge=lfs -text" >> .gitattributes
 
     - name: Push to Hugging Face Space
       env:
