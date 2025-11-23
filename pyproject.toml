@@ -31,6 +31,7 @@ dependencies = [
     "sphinx-autodoc-typehints>=3.5.2",
     "myst-parser>=4.0.1",
     "onnxmltools>=1.14.0",
+    "onnxruntime>=1.18.0",
 ]
 
 [tool.flake8]
