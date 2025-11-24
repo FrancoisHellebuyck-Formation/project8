@@ -18,7 +18,7 @@ Ce projet est une infrastructure MLOps complète incluant :
 
    readme
 
-.. .. toctree::
+.. toctree::
    :maxdepth: 2
    :caption: Modules API:
 
