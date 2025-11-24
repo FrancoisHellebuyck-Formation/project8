@@ -85,7 +85,7 @@
       </ThreadGroup>
       <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="POST /api/predict">
-          <stringProp name="HTTPSampler.path">/api/predict?model_type=sklearn</stringProp>
+          <stringProp name="HTTPSampler.path">/api/predict?model_type=onnx</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
@@ -175,7 +175,7 @@
       </ThreadGroup>
       <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="POST /api/predict_proba">
-          <stringProp name="HTTPSampler.path">/api/predict_proba?model_type=sklearn</stringProp>
+          <stringProp name="HTTPSampler.path">/api/predict_proba?model_type=onnx</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
