@@ -42,7 +42,7 @@ jobs:
       if: github.ref == 'refs/heads/main'
       with:
         personal_token: ${{ secrets.DOCS_DEPLOY_TOKEN }}
-        external_repository: $DOCS_REPOSITORY
+        external_repository: ${DOCS_REPOSITORY}
         publish_dir: ./docs/_build/html
         publish_branch: gh-pages
         user_name: 'github-actions[bot]'
