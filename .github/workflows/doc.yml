@@ -1,0 +1,50 @@
+name: Build and Deploy Documentation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+    
+    - name: Load cached venv
+      id: cached-uv-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/uv.lock') }}
+    
+    - name: Install dependencies
+      run: uv sync
+    
+    - name: Build Sphinx documentation
+      run: |
+        make docs-clean
+    
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: github.ref == 'refs/heads/main'
+      with:
+        personal_token: ${{ secrets.DOCS_DEPLOY_TOKEN }}
+        external_repository: ${{ secrets.DOCS_REPOSITORY }}
+        publish_dir: ./docs/_build/html
+        publish_branch: gh-pages
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        commit_message: 'Deploy documentation from ${{ github.repository }}@${{ github.sha }}'

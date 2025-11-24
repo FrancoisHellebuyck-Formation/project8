@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 # Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # -- Project information -----------------------------------------------------
 project = "ML API Project"
@@ -39,7 +39,7 @@ myst_enable_extensions = [
 ]
 
 # -- Options for HTML output -------------------------------------------------
-html_theme = "sphinx_rtd_theme"
+html_theme = "shibuya"
 html_static_path = ["_static"]
 
 # -- Extension configuration -------------------------------------------------

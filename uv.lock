@@ -1842,6 +1842,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "safety" },
+    { name = "shibuya" },
     { name = "skl2onnx" },
 ]
 
@@ -1887,6 +1888,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "safety", specifier = ">=3.7.0" },
+    { name = "shibuya", specifier = ">=0.0.1" },
     { name = "skl2onnx", specifier = ">=1.19.1" },
 ]
 
@@ -2029,6 +2031,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887", size = 4968631, upload-time = "2025-06-21T13:39:12.283Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/21/705964c7812476f378728bdf590ca4b771ec72385c533964653c68e86bdc/pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b", size = 1225217, upload-time = "2025-06-21T13:39:07.939Z" },
+]
+
+[[package]]
+name = "pygments-styles"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1c/2c/3886ed4783dd78bb62ccab7d43380f526a7e2ff0db8c77d9c87559b2f5de/pygments_styles-0.3.0.tar.gz", hash = "sha256:67746b8fc6ff72c1179ca4d9a8bc89c7f54c196c2ff9d087f07392cd6fde3ecf", size = 15258, upload-time = "2025-11-04T13:15:23.512Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/64/7e0266f0c541e26df86c31d2add9be3dd9914ae83785ce0aba7cbb693667/pygments_styles-0.3.0-py3-none-any.whl", hash = "sha256:c6c45e9939eb7590345bc9084113bac46c45f12b009d13422be02e80e84a034c", size = 36617, upload-time = "2025-11-04T13:15:21.989Z" },
 ]
 
 [[package]]
@@ -2517,6 +2531,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/58/15/8b3609fd3830ef7b27b655beb4b4e9c62313a4e8da8c676e142cc210d58e/shellingham-1.5.4.tar.gz", hash = "sha256:8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363404de", size = 10310, upload-time = "2023-10-24T04:13:40.426Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl", hash = "sha256:7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686", size = 9755, upload-time = "2023-10-24T04:13:38.866Z" },
+]
+
+[[package]]
+name = "shibuya"
+version = "2025.11.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pygments-styles" },
+    { name = "sphinx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cf/e3/53fe8d84008aa0f0baea769973a3e8baa2fe2895e6994ba94767ba52bb14/shibuya-2025.11.10.tar.gz", hash = "sha256:7a8a2b4ac6c3fb8d2f75a15098458e376f5af33cfff45b21e5816e41dfcc5dd3", size = 82201, upload-time = "2025-11-10T09:13:54.308Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3c/ca/1f713c8cbf777e9b2716a2c19a90e2c3fb91a111399dc05ec0b8082a8312/shibuya-2025.11.10-py3-none-any.whl", hash = "sha256:7d9116bcd14977e689c6048232bb42d739832c0dd861dc7be34dfb183edb511e", size = 98175, upload-time = "2025-11-10T09:13:52.612Z" },
 ]
 
 [[package]]
