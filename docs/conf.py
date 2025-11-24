@@ -39,7 +39,7 @@ myst_enable_extensions = [
 ]
 
 # -- Options for HTML output -------------------------------------------------
-html_theme = "sphinx_rtd_theme"
+html_theme = "shibuya"
 html_static_path = ["_static"]
 
 # -- Extension configuration -------------------------------------------------

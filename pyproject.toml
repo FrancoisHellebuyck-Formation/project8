@@ -68,6 +68,7 @@ dev = [
     "bandit>=1.9.1",
     "safety>=3.7.0",
     "skl2onnx>=1.19.1",
+    "shibuya>=0.0.1" # A vérifier, version minimum
 ]
 
 [tool.pytest.ini_options]
