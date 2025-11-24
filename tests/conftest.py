@@ -89,48 +89,72 @@ def mock_model_loader(mock_model):
     return loader
 
 
+from contextlib import asynccontextmanager
+
+from contextlib import asynccontextmanager
+from unittest.mock import MagicMock
+import numpy as np
+import pytest
+
 @pytest.fixture
-def api_client(monkeypatch, mock_model_loader, mock_model):
+def api_client(monkeypatch):
     """
     Fixture fournissant un client de test pour l'API FastAPI.
 
-    Args:
-        monkeypatch: Fixture pytest pour monkey patching.
-        mock_model_loader: Mock du ModelLoader.
-        mock_model: Mock du modèle ML.
-
-    Returns:
-        TestClient: Client de test FastAPI.
+    Cette fixture configure les mocks nécessaires pour que le lifespan
+    de l'application s'exécute, mais utilise des dépendances mockées
+    pour le chargement des modèles et autres services externes.
     """
-    import logging
-
-    # Mock du ModelLoader pour éviter de charger le vrai modèle
-    from src.model import ModelLoader, Predictor
-
-    def mock_loader_init(self):
-        self.model = mock_model
-        self._loaded = True
-
-    monkeypatch.setattr(ModelLoader, "__init__", mock_loader_init)
-    monkeypatch.setattr(ModelLoader, "load_model", lambda self: None)
-    monkeypatch.setattr(ModelLoader, "is_loaded", lambda self: True)
-
-    # Mock du Predictor
-    import numpy as np
-
-    mock_predictor = MagicMock(spec=Predictor)
-    mock_predictor.model_loader = mock_model_loader
-    mock_predictor.predict.return_value = np.array([1])
-    mock_predictor.predict_proba.return_value = np.array([[0.2, 0.8]])
-
-    # Mock du logger pour éviter l'erreur NoneType
-    mock_logger = MagicMock(spec=logging.Logger)
-
-    # Importer et patcher l'app
     from src.api import main
-    monkeypatch.setattr(main, "logger", mock_logger)
-    monkeypatch.setattr(main, "predictor", mock_predictor)
+    from src.model import ModelType
 
+    # Mock ModelLoader
+    mock_loader_class = MagicMock()
+    mock_loader_class.return_value.is_loaded.return_value = True
+    mock_loader_class.return_value.load_model.return_value = None
+    monkeypatch.setattr("src.api.main.ModelLoader", mock_loader_class)
+    monkeypatch.setattr("src.model.predictor.ModelLoader", mock_loader_class)
+
+    # Mock ONNXModelLoader
+    mock_onnx_loader = MagicMock()
+    monkeypatch.setattr("src.api.main.ONNXModelLoader", mock_onnx_loader)
+
+    # Mock Path.exists to prevent FileNotFoundError
+    mock_path_class = MagicMock()
+    mock_path_class.return_value.exists.return_value = True
+    monkeypatch.setattr("pathlib.Path", mock_path_class)
+
+    # Mock ModelPool
+    mock_sklearn_pool_instance = MagicMock()
+    mock_sklearn_pool_instance.initialize.return_value = None
+    mock_onnx_pool_instance = MagicMock()
+    mock_onnx_pool_instance.initialize.return_value = None
+    mock_model_pool_class = MagicMock()
+    mock_model_pool_class.side_effect = [mock_sklearn_pool_instance, mock_onnx_pool_instance]
+    monkeypatch.setattr("src.api.main.ModelPool", mock_model_pool_class)
+
+    # Mock the router and its model instance
+    mock_router = MagicMock()
+    mock_model_instance = MagicMock()
+    mock_model_instance.predict.return_value = np.array([1])
+    mock_model_instance.predict_proba.return_value = np.array([[0.2, 0.8]])
+
+    @asynccontextmanager
+    async def mock_acquire_model(*args, **kwargs):
+        yield mock_model_instance
+
+    mock_router.acquire_model.return_value = mock_acquire_model()
+    mock_router.is_available.side_effect = lambda x: x == ModelType.SKLEARN
+    mock_router.get_available_types.return_value = [ModelType.SKLEARN]
+    mock_router._default_type = ModelType.SKLEARN # Set default type for testing
+
+    # Patch global variables in main that are not covered by lifespan
+    monkeypatch.setattr(main, "model_router", mock_router)
+    monkeypatch.setattr(main, "predictor", MagicMock())
+    monkeypatch.setattr(main, "feature_engineer", MagicMock())
+    monkeypatch.setattr(main, "logger", MagicMock()) # Mock the logger as well
+
+    from fastapi.testclient import TestClient
     return TestClient(main.app)
 
 
