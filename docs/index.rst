@@ -32,11 +32,11 @@ Ce projet est une infrastructure MLOps complète incluant :
    :maxdepth: 2
    :caption: Guides et Documentation:
 
+   guides/docker
    guides/scripts
-   .. guides/docker
-   .. guides/model
-   .. guides/proxy
-   .. guides/jmeter
+   guides/model
+   guides/proxy
+   guides/jmeter
 
 .. toctree::
    :maxdepth: 2
