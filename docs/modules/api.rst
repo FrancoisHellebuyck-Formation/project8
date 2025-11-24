@@ -6,7 +6,7 @@ Module de l'API FastAPI pour servir le modèle ML.
 Main Application
 ----------------
 
-.. automodule:: api.main
+.. automodule:: src.api.main
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Main Application
 Logging Configuration
 ---------------------
 
-.. automodule:: api.logging_config
+.. automodule:: src.api.logging_config
    :members:
    :undoc-members:
    :show-inheritance:

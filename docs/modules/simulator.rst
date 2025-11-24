@@ -15,7 +15,7 @@ API Reference
 Simulator
 ~~~~~~~~~
 
-.. automodule:: simulator.simulator
+.. automodule:: src.simulator.simulator
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ Simulator
 Drift Analyzer
 ~~~~~~~~~~~~~~
 
-.. automodule:: simulator.drift_analyzer
+.. automodule:: src.simulator.drift_analyzer
    :members:
    :undoc-members:
    :show-inheritance:

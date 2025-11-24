@@ -15,7 +15,7 @@ API Reference
 Log Parser
 ~~~~~~~~~~
 
-.. automodule:: logs_pipeline.log_parser
+.. automodule:: src.logs_pipeline.log_parser
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +23,7 @@ Log Parser
 Elasticsearch Manager
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: logs_pipeline.elasticsearch_manager
+.. automodule:: src.logs_pipeline.elasticsearch_manager
    :members:
    :undoc-members:
    :show-inheritance:
@@ -31,7 +31,7 @@ Elasticsearch Manager
 Pipeline
 ~~~~~~~~
 
-.. automodule:: logs_pipeline.pipeline
+.. automodule:: src.logs_pipeline.pipeline
    :members:
    :undoc-members:
    :show-inheritance:
